@@ -21,6 +21,16 @@ def check_is_accessible(feature, cache_key, employee):
     if not employee:
         return False
 
+    # Superuser / staff bypass: always accessible, eliminates 70+ repetitive DB queries per page load
+    user = getattr(employee, "employee_user_id", None)
+    if user and (getattr(user, "is_superuser", False) or getattr(user, "is_staff", False)):
+        return True
+
+    # Check cache first before hitting database
+    data: dict = cache.get(cache_key, default={})
+    if data and data.get(feature) is not None:
+        return data.get(feature)
+
     accessibility = DefaultAccessibility.objects.filter(
         feature=feature, is_enabled=True
     ).first()
@@ -29,10 +39,6 @@ def check_is_accessible(feature, cache_key, employee):
         return False
     if not feature or not accessibility:
         return True
-
-    data: dict = cache.get(cache_key, default={})
-    if data and data.get(feature) is not None:
-        return data.get(feature)
 
     employees = accessibility.employees.all()
     accessible = employee in employees

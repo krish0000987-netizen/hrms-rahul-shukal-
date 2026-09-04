@@ -213,28 +213,38 @@
     });
 
     $(".oh-sidebar__menu-link").click(function (e) {
+        const href = $(this).attr("href");
+        if (href && href !== "#" && !href.startsWith("javascript")) {
+            return;
+        }
         e.preventDefault();
         const currentActiveNav = $(".oh-sidebar__menu-link--active");
-        $(currentActiveNav).removeClass("oh-sidebar__menu-link--active");
         const activeSubMenuId = $(currentActiveNav).attr("data-id");
-        $(`#${activeSubMenuId}`).attr("style", "display:none;");
-        // Get the JSON object from local storage
-        const menuStates = JSON.parse(localStorage.getItem("menuStates"));
+        
+        let menuStates = {};
+        try {
+            menuStates = JSON.parse(localStorage.getItem("menuStates") || "{}") || {};
+        } catch (err) {
+            menuStates = {};
+        }
 
-        // Update the value of a key to false
-        menuStates[activeSubMenuId] = false;
-
-        // Save the updated object to local storage
-        localStorage.setItem("menuStates", JSON.stringify(menuStates));
+        if (activeSubMenuId && activeSubMenuId !== $(this).attr("data-id")) {
+            $(currentActiveNav).removeClass("oh-sidebar__menu-link--active");
+            $(`#${activeSubMenuId}`).attr("style", "display:none;");
+            menuStates[activeSubMenuId] = false;
+        }
 
         $(this).toggleClass("oh-sidebar__menu-link--active");
         const submenuId = $(this).attr("data-id");
         const submenu = $(`#${submenuId}`);
-        if (submenu.attr("style")) {
+        if ($(this).hasClass("oh-sidebar__menu-link--active")) {
             submenu.removeAttr("style");
+            menuStates[submenuId] = true;
         } else {
             submenu.attr("style", "display:none;");
+            menuStates[submenuId] = false;
         }
+        localStorage.setItem("menuStates", JSON.stringify(menuStates));
     });
     function getOpenState(id) {
         const menuStates = JSON.parse(localStorage.getItem("menuStates") || "{}");

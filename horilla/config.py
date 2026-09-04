@@ -84,13 +84,19 @@ def sidebar(request):
 
 
 def get_MENUS(request):
-    # Rebuild at most once per request — accessibility checks hit the DB.
+    # Rebuild at most once per process / user — accessibility checks hit the DB.
     cached = getattr(request, "_horilla_menus", None)
     if cached is not None:
         return {"sidebar": cached}
-    ALL_MENUS[request.session.session_key] = []
+    user_id = getattr(getattr(request, "user", None), "id", None)
+    cache_key = f"user_{user_id}" if user_id else getattr(request.session, "session_key", "anon")
+    if cache_key in ALL_MENUS and ALL_MENUS[cache_key]:
+        request._horilla_menus = ALL_MENUS[cache_key]
+        return {"sidebar": ALL_MENUS[cache_key]}
     sidebar(request)
-    menus = ALL_MENUS.get(request.session.session_key)
+    session_key = getattr(request.session, "session_key", None)
+    menus = ALL_MENUS.get(session_key) if session_key else request.MENUS
+    ALL_MENUS[cache_key] = menus
     request._horilla_menus = menus
     return {"sidebar": menus}
 

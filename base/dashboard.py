@@ -1408,35 +1408,51 @@ def dashboard_turnover(request):
     try:
         from employee.models import Employee, EmployeeWorkInformation
         from report.engine import ReportFilters
-        from report.metrics._exits import exits_in_period
+        from report.metrics._exits import iter_exits
 
         filters = ReportFilters(from_date=today.replace(day=1), to_date=today)
 
+        month_ranges = []
         for i in range(5, -1, -1):
             year = today.year
             month = today.month - i
             while month <= 0:
                 month += 12
                 year -= 1
-            month_start = today.replace(year=year, month=month, day=1)
-            if month_start.month == 12:
-                month_end = month_start.replace(
-                    year=month_start.year + 1, month=1
+            m_start = today.replace(year=year, month=month, day=1)
+            if m_start.month == 12:
+                m_end = m_start.replace(
+                    year=m_start.year + 1, month=1
                 ) - timedelta(days=1)
             else:
-                month_end = month_start.replace(
-                    month=month_start.month + 1
+                m_end = m_start.replace(
+                    month=m_start.month + 1
                 ) - timedelta(days=1)
+            month_ranges.append((m_start, m_end))
 
-            hires = EmployeeWorkInformation.objects.filter(
-                date_joining__gte=month_start,
-                date_joining__lte=month_end,
-            ).count()
-            exits = exits_in_period(filters, from_date=month_start, to_date=month_end)
+        earliest_start = month_ranges[0][0]
+        latest_end = month_ranges[-1][1]
 
+        # Batch query all hires in the 6-month window in one query
+        hire_dates = list(
+            EmployeeWorkInformation.objects.filter(
+                date_joining__gte=earliest_start,
+                date_joining__lte=latest_end,
+            ).values_list("date_joining", flat=True)
+        )
+
+        # Batch query all exits in the 6-month window in one query
+        all_exits = iter_exits(
+            filters, from_date=earliest_start, to_date=latest_end
+        )
+        exit_dates = [e["exit_date"] for e in all_exits if e.get("exit_date")]
+
+        for m_start, m_end in month_ranges:
+            hires = sum(1 for d in hire_dates if d and m_start <= d <= m_end)
+            exits = sum(1 for d in exit_dates if d and m_start <= d <= m_end)
             months.append(
                 {
-                    "month": month_start.strftime("%b %Y"),
+                    "month": m_start.strftime("%b %Y"),
                     "hires": hires,
                     "exits": exits,
                     "net": hires - exits,

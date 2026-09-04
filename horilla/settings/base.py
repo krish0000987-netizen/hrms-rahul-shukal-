@@ -363,10 +363,10 @@ X_FRAME_OPTIONS = "SAMEORIGIN"
 # every include, on every request. Left uncached in DEBUG so template
 # edits during development are picked up without restarting the server.
 _TEMPLATE_LOADERS = [
-    "horilla_dbtemplate.loaders.Loader",
     ("django.template.loaders.filesystem.Loader", [BASE_DIR / THEME_APP / "templates"]),
-    "django.template.loaders.app_directories.Loader",
     ("django.template.loaders.filesystem.Loader", [BASE_DIR / "templates"]),
+    "django.template.loaders.app_directories.Loader",
+    "horilla_dbtemplate.loaders.Loader",
 ]
 
 TEMPLATES = [
