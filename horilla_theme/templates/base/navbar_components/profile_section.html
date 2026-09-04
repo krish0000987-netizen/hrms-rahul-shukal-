@@ -44,10 +44,7 @@
                 <button class="py-1.5 hover:text-primary-600 transition duration-300 text-sm gap-4 items-center flex w-full">
                     <a
                         class="text-[13px]"
-                        hx-get="{% url 'employee-profile' request.user.employee_get.id %}"
-                        hx-target="#ohMainContent"
-                        hx-swap="innerHTML show:window:top"
-                        hx-push-url="{% url 'employee-profile' %}"
+                        href="{% url 'employee-profile' request.user.employee_get.id %}"
                     >{% trans "My Profile" %}</a>
                 </button>
             </li>
@@ -56,11 +53,6 @@
                     <a
                         class="text-[13px]"
                         href="{% url 'change-username' %}"
-                        hx-get="{% url 'change-username' %}"
-                        hx-target="#ohMainContent"
-                        hx-select="#ohMainContent > *"
-                        hx-swap="innerHTML show:window:top"
-                        hx-push-url="true"
                     >{% trans "Change Username" %}</a>
                 </button>
             </li>
@@ -69,11 +61,6 @@
                     <a
                         class="text-[13px]"
                         href="{% url 'change-password' %}"
-                        hx-get="{% url 'change-password' %}"
-                        hx-target="#ohMainContent"
-                        hx-select="#ohMainContent > *"
-                        hx-swap="innerHTML show:window:top"
-                        hx-push-url="true"
                     >{% trans "Change Password" %}</a>
                 </button>
             </li>

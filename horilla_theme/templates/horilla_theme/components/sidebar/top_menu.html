@@ -8,11 +8,6 @@
     href="{% url 'dashboard' %}"
     class="sideboxmain group flex items-center gap-3 px-3 py-2.5 rounded-lg w-full transition duration-300"
     data-menu="Dashboard"
-    hx-get="{% url 'dashboard' %}"
-    hx-target="#ohMainContent"
-    hx-select="#ohMainContent > *"
-    hx-swap="innerHTML show:window:top"
-    hx-push-url="true"
 >
     <img
         src="{% static 'images/ui/dashboard.svg' %}"

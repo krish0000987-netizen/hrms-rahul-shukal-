@@ -566,11 +566,6 @@
                                     href="{{ submenu.redirect }}"
                                     {% if submenu.match_prefixes %}data-match-prefixes="{{ submenu.match_prefixes|join:',' }}"{% endif %}
                                     class="sidebar-subnav-link block text-[13px] text-gray-600 px-3 py-1.5 rounded-md hover:bg-gray-50 hover:text-gray-900 transition-colors duration-150 truncate"
-                                    hx-get="{{ submenu.redirect }}"
-                                    hx-target="#ohMainContent"
-                                    hx-select="#ohMainContent > *"
-                                    hx-swap="innerHTML show:window:top"
-                                    hx-push-url="true"
                                 >{{ submenu.menu }}</a>
                             </li>
                         {% endfor %}
@@ -830,26 +825,9 @@
             var isLeftClick = !e.button || e.button === 0;
             var isModified = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
             if (!isLeftClick || isModified) return;
-            e.preventDefault();
-            e.stopPropagation();
             var href = link.getAttribute("href") || link.getAttribute("hx-get") || "/";
-            // Capture the owning module button BEFORE hideFlyout() nulls currentFlyoutBtn
-            var activeModuleBtn = currentFlyoutBtn;
             hideFlyout();
-            if (isStandaloneUrl(href)) { window.location.href = href; return; }
-            var target = document.getElementById("ohMainContent");
-            if (!target || !window.htmx) { window.location.href = href; return; }
-            document.querySelectorAll(".sidebar-subnav-link").forEach(function (l) { l.classList.remove("oh-sidebar-active-link"); });
-            link.classList.add("oh-sidebar-active-link");
-            // activeModuleBtn is always the correct parent — no href-matching needed
-            if (activeModuleBtn) setActiveSidebarMenu(activeModuleBtn);
-            bumpGrace(1500);
-            window.history.pushState({}, "", href);
-            htmx.ajax("GET", href, {
-              source: link, target: "#ohMainContent",
-              select: "#ohMainContent > *", swap: "innerHTML show:window:top",
-              headers: { "HX-Sidebar-Nav": "true" },
-            });
+            window.location.href = href;
           }, true);
         }
 
@@ -998,33 +976,9 @@
             var isModified = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
             if (!isLeftClick || isModified) return;
 
-            e.preventDefault();
-            e.stopPropagation();
-            if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
-
             var href = link.getAttribute("href") || link.getAttribute("hx-get") || "/";
-            if (isStandaloneUrl(href)) { window.location.href = href; return; }
-
-            var target = document.getElementById("ohMainContent");
-            if (!target || !window.htmx) { window.location.href = href; return; }
-
-            document.querySelectorAll(".sidebar-subnav-link").forEach(function (l) {
-              l.classList.remove("oh-sidebar-active-link");
-            });
-            link.classList.add("oh-sidebar-active-link");
-            var parentItem = link.closest(".sidebar-item");
-            var parentBtn = parentItem && parentItem.querySelector(".sideboxmain");
-            if (parentBtn) setActiveSidebarMenu(parentBtn);
-
-            bumpGrace(1500);
-            window.history.pushState({}, "", href);
-            htmx.ajax("GET", href, {
-              source: link,
-              target: "#ohMainContent",
-              select: "#ohMainContent > *",
-              swap: "innerHTML show:window:top",
-              headers: { "HX-Sidebar-Nav": "true" },
-            });
+            hideFlyout();
+            window.location.href = href;
           }, true);
 
           // Bubble phase: top-level dashboard link + module button accordion toggles
@@ -1038,20 +992,8 @@
               var isTopDashboard = link.matches("a.sideboxmain");
 
               if (isTopDashboard) {
-                e.preventDefault();
-                e.stopPropagation();
                 hideFlyout();
-                setActiveSidebarMenu(link);
-                if (isStandaloneUrl(href)) { window.location.href = href || "/"; return; }
-                var target = document.getElementById("ohMainContent");
-                if (!target || !window.htmx) { window.location.href = href || "/"; return; }
-                bumpGrace(1500);
-                window.history.pushState({}, "", href);
-                htmx.ajax("GET", href, {
-                  source: link, target: "#ohMainContent",
-                  select: "#ohMainContent > *", swap: "innerHTML show:window:top",
-                  headers: { "HX-Sidebar-Nav": "true" },
-                });
+                window.location.href = href || "/";
                 return;
               }
             }
