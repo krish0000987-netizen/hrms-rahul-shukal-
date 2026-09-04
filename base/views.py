@@ -792,17 +792,22 @@ def login_user(request):
     Handles user login and authentication.
     """
     if request.method == "POST":
-        username = request.POST.get("username")
-        password = request.POST.get("password")
+        username = (request.POST.get("username") or "").strip()
+        password = request.POST.get("password") or ""
         next_url = request.GET.get("next", "/")
         query_params = request.GET.dict()
         query_params.pop("next", None)
         params = urlencode(query_params)
 
         user = authenticate(request, username=username, password=password)
+        if not user:
+            # Also attempt authentication if user provided their email address
+            user_by_email = HorillaUser.objects.filter(email__iexact=username).first()
+            if user_by_email:
+                user = authenticate(request, username=user_by_email.username, password=password)
 
         if not user:
-            user_object = HorillaUser.objects.filter(username=username).first()
+            user_object = HorillaUser.objects.filter(username=username).first() or HorillaUser.objects.filter(email__iexact=username).first()
             if user_object and not user_object.is_active:
                 messages.warning(request, _("Access Denied: Your account is blocked."))
             else:
