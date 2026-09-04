@@ -224,7 +224,7 @@ USE_SUPABASE_STORAGE = env.bool(
 # ========================================
 # DATABASE CONFIGURATION
 # ========================================
-DEFAULT_SUPABASE_DATABASE_URL = "postgresql://postgres.klfbbxsbzmdhfnsrmdui:NPCWdJo7JAUyzfzdvYeve1uF@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres?sslmode=require"
+DEFAULT_SUPABASE_DATABASE_URL = "postgresql://postgres.klfbbxsbzmdhfnsrmdui:NPCWdJo7JAUyzfzdvYeve1uF@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres?sslmode=require"
 
 raw_db_url = (
     env("DATABASE_URL", default=None)
@@ -237,7 +237,11 @@ raw_db_url = (
 )
 
 if raw_db_url:
+    # Use Supabase transaction pooler port (6543) for serverless deployments
+    if "pooler.supabase.com:5432" in raw_db_url:
+        raw_db_url = raw_db_url.replace(":5432", ":6543")
     DATABASES = {"default": env.db_url_config(raw_db_url)}
+    DATABASES["default"]["CONN_MAX_AGE"] = 0
     if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
         DATABASES["default"].setdefault("OPTIONS", {})
         DATABASES["default"]["OPTIONS"].update({
