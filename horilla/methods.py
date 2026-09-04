@@ -11,21 +11,24 @@ from django.utils.translation import gettext as _
 from horilla_auth.models import HorillaUser
 
 
+from django.apps import apps
+
+
 def get_horilla_model_class(app_label, model):
     """
-    Retrieves the model class for the given app label and model name using Django's ContentType framework.
-
-    Args:
-        app_label (str): The label of the application where the model is defined.
-        model (str): The name of the model to retrieve.
-
-    Returns:
-        Model: The Django model class corresponding to the specified app label and model name.
-
+    Retrieves the model class for the given app label and model name.
+    First tries Django's apps registry (fast, no DB query), then falls back to ContentType.
     """
-    content_type = ContentType.objects.get_by_natural_key(app_label, model)
-    model_class = content_type.model_class()
-    return model_class
+    try:
+        return apps.get_model(app_label, model)
+    except Exception:
+        pass
+
+    try:
+        content_type = ContentType.objects.get_by_natural_key(app_label, model)
+        return content_type.model_class() if content_type else None
+    except Exception:
+        return None
 
 
 def dynamic_attr(obj, attribute_path):
