@@ -42,9 +42,38 @@ if os.getenv("VERCEL") or os.getenv("VERCEL_ENV"):
         ALLOWED_HOSTS.append(".vercel.app")
     if "*" not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append("*")
-CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS", default=["https://*.vercel.app", "http://localhost:8000"])
-if isinstance(CSRF_TRUSTED_ORIGINS, str):
-    CSRF_TRUSTED_ORIGINS = [o.strip() for o in CSRF_TRUSTED_ORIGINS.split(",") if o.strip()]
+raw_csrf = env("CSRF_TRUSTED_ORIGINS", default=["https://*.vercel.app", "http://localhost:8000"])
+if isinstance(raw_csrf, str):
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in raw_csrf.split(",") if o.strip()]
+elif isinstance(raw_csrf, (list, tuple)):
+    CSRF_TRUSTED_ORIGINS = list(raw_csrf)
+else:
+    CSRF_TRUSTED_ORIGINS = ["https://*.vercel.app", "http://localhost:8000"]
+
+# Ensure all vercel domains and local hosts are trusted for CSRF
+for origin in [
+    "https://*.vercel.app",
+    "https://hrms-rahul-sir-plum.vercel.app",
+    "https://hrms-rahul-sir.vercel.app",
+    "https://hrms-rahul-sir-krishnaarav551-8480s-projects.vercel.app",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]:
+    if origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
+
+# Reverse-proxy and HTTPS handling for Vercel / Serverless
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
+if os.getenv("VERCEL") or os.getenv("VERCEL_ENV"):
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_HTTPONLY = False
+
 HORILLA_ENV = env("HORILLA_ENV", default="")
 REDIS_URL = env("REDIS_URL", default=None)
 
