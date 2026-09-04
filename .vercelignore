@@ -9,7 +9,7 @@ docker
 Dockerfile
 docker-compose*.yml
 *.md
-Makefile
+staticfiles
 load_data
 .env*
 !base/management/commands/createrahuluser.py
