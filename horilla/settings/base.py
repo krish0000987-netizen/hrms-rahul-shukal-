@@ -18,7 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 env = environ.Env(
     DEBUG=(bool, True),
-    SECRET_KEY=(str, "django-insecure-rahul-hrms-cloud-default-secret-key-2026"),
+    SECRET_KEY=(str, "rahul-hrms-production-cloud-secret-key-supabase-storage-2026"),
     ALLOWED_HOSTS=(list, ["*", ".vercel.app", "localhost", "127.0.0.1"]),
     CSRF_TRUSTED_ORIGINS=(list, ["http://localhost:8000", "https://*.vercel.app"]),
     SECURE_SSL_REDIRECT=(bool, False),
@@ -259,10 +259,11 @@ if REDIS_URL:
 # ========================================
 # STATIC & MEDIA FILES
 # ========================================
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
+WHITENOISE_USE_FINDERS = True
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media/")

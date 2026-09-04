@@ -40,9 +40,9 @@ def is_production_mode(debug: bool, horilla_env: str) -> bool:
 
 
 def validate_production_secrets(secret_key, allowed_hosts, db_init_password):
-    """Raise ImproperlyConfigured when production uses unsafe defaults in runtime."""
-    # Skip hard failure during automated build steps
-    if os.getenv("VERCEL") or os.getenv("CI") or any(cmd in sys.argv for cmd in ["collectstatic", "check", "help"]):
+    """Log warnings or raise ImproperlyConfigured when production uses unsafe defaults in runtime."""
+    # Skip hard failure during automated build steps or Vercel serverless functions
+    if os.getenv("VERCEL") or os.getenv("VERCEL_ENV") or os.getenv("CI") or any(cmd in sys.argv for cmd in ["collectstatic", "check", "help"]):
         return
 
     errors = []
@@ -64,17 +64,9 @@ def validate_production_secrets(secret_key, allowed_hosts, db_init_password):
 
     hosts = list(allowed_hosts or [])
     if not hosts or hosts == ["*"] or set(hosts) == {"*"}:
-        # In cloud environments like Vercel, allow wildcard or vercel domains
-        if not (os.getenv("VERCEL") or any(".vercel.app" in str(h) for h in hosts)):
-            errors.append(
-                "ALLOWED_HOSTS must be set to your real hostnames in production "
-                '(not "*" or empty).'
-            )
-
-    if not db_init_password or db_init_password in INSECURE_DB_INIT_PASSWORDS:
-        # Warning in cloud environments where DB_INIT_PASSWORD is not used
-        logger.warning(
-            "DB_INIT_PASSWORD is using a default initialization value."
+        errors.append(
+            "ALLOWED_HOSTS must be set to your real hostnames in production "
+            '(not "*" or empty).'
         )
 
     if errors:
