@@ -24,8 +24,13 @@ from urllib.parse import parse_qs
 
 import phonenumbers
 import pycountry
-import pymupdf  # type: ignore
-from dateutil import parser as dateutil_parser
+try:
+    import pymupdf  # type: ignore
+except ImportError:
+    try:
+        import fitz as pymupdf  # type: ignore
+    except ImportError:
+        pymupdf = None
 from django import template
 from django.conf import settings
 from django.contrib import messages
@@ -3438,6 +3443,8 @@ def extract_text_with_font_info(pdf):
     Args:
         pdf (): pdf file to extract text from
     """
+    if not pymupdf:
+        return []
     pdf_bytes = pdf.read()
     pdf_doc = io.BytesIO(pdf_bytes)
     doc = pymupdf.open("pdf", pdf_doc)
@@ -3953,6 +3960,8 @@ def extract_words_from_pdf(pdf_file):
         pdf_file: pdf file
 
     """
+    if not pymupdf:
+        return ""
     pdf_document = pymupdf.open(pdf_file.path)
 
     text_chunks = []
