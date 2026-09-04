@@ -787,6 +787,10 @@ def initialize_job_position_delete(request, obj_id):
     )
 
 
+from django.views.decorators.csrf import csrf_exempt
+
+
+@csrf_exempt
 def login_user(request):
     """
     Handles user login and authentication.
