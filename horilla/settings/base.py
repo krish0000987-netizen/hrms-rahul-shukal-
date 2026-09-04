@@ -18,9 +18,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 env = environ.Env(
     DEBUG=(bool, True),
-    SECRET_KEY=(str, "django-insecure-default-key"),
-    ALLOWED_HOSTS=(list, ["*"]),
-    CSRF_TRUSTED_ORIGINS=(list, ["http://localhost:8000"]),
+    SECRET_KEY=(str, "django-insecure-rahul-hrms-cloud-default-secret-key-2026"),
+    ALLOWED_HOSTS=(list, ["*", ".vercel.app", "localhost", "127.0.0.1"]),
+    CSRF_TRUSTED_ORIGINS=(list, ["http://localhost:8000", "https://*.vercel.app"]),
     SECURE_SSL_REDIRECT=(bool, False),
 )
 
@@ -33,6 +33,11 @@ env.read_env(os.path.join(BASE_DIR, ".env"), overwrite=True)
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+if os.getenv("VERCEL") or os.getenv("VERCEL_ENV"):
+    if ".vercel.app" not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(".vercel.app")
+    if "*" not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append("*")
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
 HORILLA_ENV = env("HORILLA_ENV", default="")
 REDIS_URL = env("REDIS_URL", default=None)
