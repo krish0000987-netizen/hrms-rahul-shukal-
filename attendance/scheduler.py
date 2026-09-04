@@ -108,7 +108,12 @@ if not any(
     """
     Initializes and starts background tasks using APScheduler when the server is running.
     """
-    scheduler = BackgroundScheduler(timezone=pytz.timezone(settings.TIME_ZONE))
+    tz_str = getattr(settings, "TIME_ZONE", None) or "Asia/Kolkata"
+    try:
+        tz = pytz.timezone(tz_str)
+    except Exception:
+        tz = pytz.timezone("Asia/Kolkata")
+    scheduler = BackgroundScheduler(timezone=tz)
 
     scheduler.add_job(
         create_work_record, "interval", minutes=30, misfire_grace_time=3600 * 3
