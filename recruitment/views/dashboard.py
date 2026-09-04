@@ -187,20 +187,21 @@ def dashboard_pipeline(request):
     data_set = []
     labels = [type[1] for type in Stage.stage_types]
     for rec in recruitment_obj:
+        if not rec.candidate.exists():
+            continue
         data = [stage_type_candidate_count(rec, type[0]) for type in Stage.stage_types]
-        if rec.candidate.all():
-            data_set.append(
-                {
-                    "label": (
-                        rec.title
-                        if rec.title is not None
-                        else f"""{rec.job_position_id}
-                    {rec.start_date}"""
-                    ),
-                    "data": data,
-                    "id": rec.id,
-                }
-            )
+        data_set.append(
+            {
+                "label": (
+                    rec.title
+                    if rec.title is not None
+                    else f"""{rec.job_position_id}
+                {rec.start_date}"""
+                ),
+                "data": data,
+                "id": rec.id,
+            }
+        )
     response = JsonResponse(
         {
             "dataSet": data_set,

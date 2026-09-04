@@ -73,7 +73,7 @@ class SupabaseStorage(Storage):
         path = self._get_storage_path(name)
         url = f"{self.supabase_url}/storage/v1/object/{self.bucket_name}/{path}"
         try:
-            resp = requests.get(url, headers=self._get_headers())
+            resp = requests.get(url, headers=self._get_headers(), timeout=3)
             if resp.status_code == 200:
                 return ContentFile(resp.content)
             raise IOError(f"Supabase download returned status {resp.status_code}: {resp.text}")
@@ -102,10 +102,10 @@ class SupabaseStorage(Storage):
 
         url = f"{self.supabase_url}/storage/v1/object/{self.bucket_name}/{path}"
         try:
-            resp = requests.post(url, headers=headers, data=file_bytes)
+            resp = requests.post(url, headers=headers, data=file_bytes, timeout=3)
             if resp.status_code not in (200, 201):
                 # Try PUT if POST fails on existing object
-                resp = requests.put(url, headers=headers, data=file_bytes)
+                resp = requests.put(url, headers=headers, data=file_bytes, timeout=3)
         except Exception as e:
             logger.warning(f"Supabase storage upload notice for {path}: {e}")
 
@@ -125,6 +125,7 @@ class SupabaseStorage(Storage):
                 url,
                 headers=self._get_headers("application/json"),
                 json={"prefixes": [path]},
+                timeout=3,
             )
         except Exception:
             pass
@@ -143,6 +144,7 @@ class SupabaseStorage(Storage):
                 url,
                 headers=self._get_headers("application/json"),
                 json={"prefix": folder, "limit": 100},
+                timeout=3,
             )
             if resp.status_code == 200:
                 files = resp.json()
@@ -164,6 +166,7 @@ class SupabaseStorage(Storage):
                 url,
                 headers=self._get_headers("application/json"),
                 json={"expiresIn": self.signed_url_expires_in},
+                timeout=3,
             )
             if resp.status_code == 200:
                 data = resp.json()
@@ -189,6 +192,7 @@ class SupabaseStorage(Storage):
                 url,
                 headers=self._get_headers("application/json"),
                 json={"prefix": folder, "limit": 100},
+                timeout=3,
             )
             if resp.status_code == 200:
                 files = resp.json()

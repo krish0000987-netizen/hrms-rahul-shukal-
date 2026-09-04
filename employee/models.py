@@ -299,9 +299,18 @@ class Employee(models.Model):
         )
 
     def get_avatar(self):
-        if self.employee_profile and default_storage.exists(self.employee_profile.name):
-            return self.employee_profile.url
-        return static("images/ui/default_avatar.jpg")
+        if hasattr(self, "_cached_avatar"):
+            return self._cached_avatar
+        try:
+            if self.employee_profile and self.employee_profile.name:
+                url = self.employee_profile.url
+                if url:
+                    self._cached_avatar = url
+                    return url
+        except Exception:
+            pass
+        self._cached_avatar = static("images/ui/default_avatar.jpg")
+        return self._cached_avatar
 
     def get_active_status(self):
         """

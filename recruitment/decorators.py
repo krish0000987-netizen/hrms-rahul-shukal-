@@ -75,6 +75,9 @@ def manager_can_enter(function, perm=None, perms=None):
 
     def _function(request, *args, **kwargs):
         user = request.user
+        if getattr(user, "is_superuser", False):
+            return function(request, *args, **kwargs)
+
         employee = Employee.objects.filter(employee_user_id=user).first()
 
         is_manager = (
