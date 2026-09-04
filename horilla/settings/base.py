@@ -24,8 +24,8 @@ env = environ.Env(
     SECURE_SSL_REDIRECT=(bool, False),
 )
 
-# Existing process environment (Compose, systemd, CI) wins over .env values.
-env.read_env(os.path.join(BASE_DIR, ".env"), overwrite=True)
+# Existing process environment (Compose, systemd, CI, Vercel) wins over .env values.
+env.read_env(os.path.join(BASE_DIR, ".env"), overwrite=False)
 
 # ========================================
 # CORE DJANGO SETTINGS
@@ -175,10 +175,10 @@ ROOT_URLCONF = "horilla.urls"
 # ========================================
 # SUPABASE CONFIGURATION
 # ========================================
-SUPABASE_URL = env("SUPABASE_URL", default="")
-SUPABASE_PUBLISHABLE_KEY = env("SUPABASE_PUBLISHABLE_KEY", default="")
+SUPABASE_URL = env("SUPABASE_URL", default=os.getenv("SUPABASE_URL", "https://klfbbxsbzmdhfnsrmdui.supabase.co"))
+SUPABASE_PUBLISHABLE_KEY = env("SUPABASE_PUBLISHABLE_KEY", default=os.getenv("SUPABASE_PUBLISHABLE_KEY", ""))
 SUPABASE_ANON_KEY = env("SUPABASE_ANON_KEY", default=env("SUPABASE_PUBLISHABLE_KEY", default=""))
-SUPABASE_SECRET_KEY = env("SUPABASE_SECRET_KEY", default="")
+SUPABASE_SECRET_KEY = env("SUPABASE_SECRET_KEY", default=os.getenv("SUPABASE_SECRET_KEY", ""))
 SUPABASE_SERVICE_ROLE_KEY = env("SUPABASE_SERVICE_ROLE_KEY", default=env("SUPABASE_SECRET_KEY", default=""))
 SUPABASE_STORAGE_BUCKET = env("SUPABASE_STORAGE_BUCKET", default="rahul-hrms")
 USE_SUPABASE_STORAGE = env.bool(
@@ -189,18 +189,30 @@ USE_SUPABASE_STORAGE = env.bool(
 # ========================================
 # DATABASE CONFIGURATION
 # ========================================
-if env("DATABASE_URL", default=None) or env("SUPABASE_DATABASE_URL", default=None):
-    db_url = env("DATABASE_URL", default=None) or env("SUPABASE_DATABASE_URL")
-    DATABASES = {"default": env.db_url_config(db_url)}
-elif env("SUPABASE_DB_HOST", default=None):
+raw_db_url = (
+    env("DATABASE_URL", default=None)
+    or env("SUPABASE_DATABASE_URL", default=None)
+    or env("POSTGRES_URL", default=None)
+    or env("POSTGRESQL_URL", default=None)
+)
+
+if raw_db_url:
+    DATABASES = {"default": env.db_url_config(raw_db_url)}
+    if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
+        DATABASES["default"].setdefault("OPTIONS", {})
+        DATABASES["default"]["OPTIONS"].update({
+            "connect_timeout": 15,
+            "sslmode": env("DB_SSLMODE", default="require"),
+        })
+elif env("SUPABASE_DB_HOST", default=None) or env("DB_HOST", default=None):
     DATABASES = {
         "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": env("SUPABASE_DB_NAME", default="postgres"),
-            "USER": env("SUPABASE_DB_USER", default="postgres"),
-            "PASSWORD": env("SUPABASE_DB_PASSWORD", default=""),
-            "HOST": env("SUPABASE_DB_HOST"),
-            "PORT": env("SUPABASE_DB_PORT", default="5432"),
+            "ENGINE": env("DB_ENGINE", default="django.db.backends.postgresql"),
+            "NAME": env("SUPABASE_DB_NAME", default=env("DB_NAME", default="postgres")),
+            "USER": env("SUPABASE_DB_USER", default=env("DB_USER", default="postgres")),
+            "PASSWORD": env("SUPABASE_DB_PASSWORD", default=env("DB_PASSWORD", default="")),
+            "HOST": env("SUPABASE_DB_HOST", default=env("DB_HOST", default="")),
+            "PORT": env("SUPABASE_DB_PORT", default=env("DB_PORT", default="5432")),
             "OPTIONS": {
                 "connect_timeout": 15,
                 "sslmode": env("DB_SSLMODE", default="require"),
@@ -208,10 +220,13 @@ elif env("SUPABASE_DB_HOST", default=None):
         }
     }
 else:
+    db_name = env("DB_NAME", default=None)
+    if not db_name:
+        db_name = "/tmp/TestDB.sqlite3" if os.getenv("VERCEL") else os.path.join(BASE_DIR, "TestDB.sqlite3")
     DATABASES = {
         "default": {
             "ENGINE": env("DB_ENGINE", default="django.db.backends.sqlite3"),
-            "NAME": env("DB_NAME", default=os.path.join(BASE_DIR, "TestDB.sqlite3")),
+            "NAME": db_name,
             "USER": env("DB_USER", default=""),
             "PASSWORD": env("DB_PASSWORD", default=""),
             "HOST": env("DB_HOST", default=""),
