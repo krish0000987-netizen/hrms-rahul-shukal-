@@ -31,7 +31,7 @@ env.read_env(os.path.join(BASE_DIR, ".env"), overwrite=False)
 # CORE DJANGO SETTINGS
 # ========================================
 SECRET_KEY = env("SECRET_KEY", default=None) or os.getenv("SECRET_KEY") or "rahul-hrms-production-cloud-secret-key-supabase-storage-2026-secure"
-DEBUG = env.bool("DEBUG", default=False if (os.getenv("VERCEL") or os.getenv("VERCEL_ENV")) else True)
+DEBUG = env.bool("DEBUG", default=True)
 ALLOWED_HOSTS = env("ALLOWED_HOSTS", default=["*"])
 if isinstance(ALLOWED_HOSTS, str):
     ALLOWED_HOSTS = [h.strip() for h in ALLOWED_HOSTS.split(",") if h.strip()]
