@@ -34,6 +34,22 @@
 
 ---
 
+## 🌐 Vercel Serverless Deployment
+
+Rahul HRMS is configured for deployment on Vercel using `vercel.json` and WSGI serverless handling:
+
+1. Import the repository in [Vercel](https://vercel.com).
+2. Configure your Environment Variables:
+   - `DATABASE_URL`: `postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require`
+   - `SUPABASE_URL`: `https://<project-ref>.supabase.co`
+   - `SUPABASE_SERVICE_ROLE_KEY`: `<service-role-key>`
+   - `SUPABASE_STORAGE_BUCKET`: `rahul-hrms`
+   - `SECRET_KEY`: `<secure-secret-key>`
+   - `DEBUG`: `False`
+3. Click **Deploy**.
+
+---
+
 ## ⚡ Quick Start & Local Setup
 
 ### 1. Prerequisites
