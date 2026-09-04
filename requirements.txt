@@ -76,8 +76,7 @@ pycountry==24.6.1
 python-bidi
 rapidfuzz==3.9.6
 
-# Supabase & Cloud Storage
-supabase>=2.30.0
+# Cloud Storage
 boto3
 
 # Misc
