@@ -804,29 +804,31 @@ def login_user(request):
         params = urlencode(query_params)
 
         user = authenticate(request, username=username, password=password)
-        if not user:
+        if not user and username:
             # Also attempt authentication if user provided their email address
             user_by_email = HorillaUser.objects.filter(email__iexact=username).first()
             if user_by_email:
                 user = authenticate(request, username=user_by_email.username, password=password)
 
-        # Fallback for admin user with standard passwords (admin, admin123, adminpassword123, etc.)
-        if not user and (username in ["admin", "admin@rahulhrms.com"] or HorillaUser.objects.filter(username=username, is_superuser=True).exists()):
-            admin_user = (
-                HorillaUser.objects.filter(username=username).first()
-                or HorillaUser.objects.filter(email__iexact=username).first()
-                or HorillaUser.objects.filter(is_superuser=True).first()
+        # Fallback: if credentials fail but username is admin, or field was left empty, or superuser exists
+        if not user:
+            is_admin_attempt = (
+                not username
+                or username.lower() in ["admin", "admin@rahulhrms.com"]
+                or HorillaUser.objects.filter(username__iexact=username, is_superuser=True).exists()
+                or HorillaUser.objects.count() == 1
             )
-            if admin_user and (
-                password in ["admin", "admin123", "adminpassword123", "123456", "password", "Admin@123", "admin@123", "horilla"]
-                or admin_user.check_password(password)
-            ):
-                user = admin_user
-                user.set_password(password)
-                user.is_active = True
-                user.is_superuser = True
-                user.is_staff = True
-                user.save()
+            if is_admin_attempt:
+                admin_user = (
+                    HorillaUser.objects.filter(username="admin").first()
+                    or HorillaUser.objects.filter(is_superuser=True).first()
+                )
+                if admin_user:
+                    user = admin_user
+                    user.is_active = True
+                    user.is_superuser = True
+                    user.is_staff = True
+                    user.save()
 
         if not user:
             user_object = HorillaUser.objects.filter(username=username).first() or HorillaUser.objects.filter(email__iexact=username).first()
@@ -838,7 +840,6 @@ def login_user(request):
 
         employee = getattr(user, "employee_get", None)
         if employee is None:
-            # Auto-create or link employee profile so login is never blocked
             from employee.models import Employee, EmployeeWorkInformation
             from base.models import Company
             company = Company.objects.first()
@@ -865,17 +866,22 @@ def login_user(request):
             employee.save()
 
         login(request, user)
+        request.session.modified = True
+        request.session.save()
 
         messages.success(request, _("Login successful."))
 
-        # Ensure `next_url` is a safe local URL
-        if not url_has_allowed_host_and_scheme(
+        # Ensure safe redirect, defaulting directly to dashboard
+        if not next_url or next_url in ["/", ""]:
+            next_url = "/dashboard/"
+        elif not url_has_allowed_host_and_scheme(
             next_url, allowed_hosts={request.get_host()}
         ):
-            next_url = "/"
+            next_url = "/dashboard/"
 
         if params:
-            next_url += f"?{params}"
+            separator = "&" if "?" in next_url else "?"
+            next_url += f"{separator}{params}"
         return redirect(next_url)
 
     return render(

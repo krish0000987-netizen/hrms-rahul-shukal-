@@ -45,7 +45,7 @@
                     <p class="text-muted text-center">
                         {% trans "Please login to access the dashboard." %}
                     </p>
-                    <form method="post" class="oh-form-group">
+                    <form method="post" action="{% url 'login' %}" class="oh-form-group">
                         {% csrf_token %}
                         <div class="oh-input-group">
                             <label class="oh-label" for="username">{% trans "Username" %}</label>
