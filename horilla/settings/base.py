@@ -49,9 +49,9 @@ HORILLA_ENV = env("HORILLA_ENV", default="")
 REDIS_URL = env("REDIS_URL", default=None)
 
 # Application Branding
-APP_NAME = env("APP_NAME", default="Rahul HRMS")
-APP_SUBTITLE = env("APP_SUBTITLE", default="Human Resource Management System")
-DOC_BASE_URL = env("DOC_BASE_URL", default="#")
+APP_NAME = env("APP_NAME", default=None) or "Rahul HRMS"
+APP_SUBTITLE = env("APP_SUBTITLE", default=None) or "Human Resource Management System"
+DOC_BASE_URL = env("DOC_BASE_URL", default=None) or "#"
 
 # Default site ID for django.contrib.sites framework.
 SITE_ID = 1
@@ -186,7 +186,7 @@ SUPABASE_PUBLISHABLE_KEY = env("SUPABASE_PUBLISHABLE_KEY", default=os.getenv("SU
 SUPABASE_ANON_KEY = env("SUPABASE_ANON_KEY", default=env("SUPABASE_PUBLISHABLE_KEY", default=""))
 SUPABASE_SECRET_KEY = env("SUPABASE_SECRET_KEY", default=os.getenv("SUPABASE_SECRET_KEY", ""))
 SUPABASE_SERVICE_ROLE_KEY = env("SUPABASE_SERVICE_ROLE_KEY", default=env("SUPABASE_SECRET_KEY", default=""))
-SUPABASE_STORAGE_BUCKET = env("SUPABASE_STORAGE_BUCKET", default="rahul-hrms")
+SUPABASE_STORAGE_BUCKET = env("SUPABASE_STORAGE_BUCKET", default=None) or "rahul-hrms"
 USE_SUPABASE_STORAGE = env.bool(
     "USE_SUPABASE_STORAGE",
     default=bool(SUPABASE_URL and (SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY or SUPABASE_ANON_KEY)),
@@ -380,8 +380,8 @@ WSGI_APPLICATION = "horilla.wsgi.application"
 # ========================================
 # INTERNATIONALIZATION
 # ========================================
-LANGUAGE_CODE = "en-us"
-TIME_ZONE = env("TIME_ZONE", default="Asia/Kolkata")
+LANGUAGE_CODE = env("LANGUAGE_CODE", default=None) or "en-us"
+TIME_ZONE = env("TIME_ZONE", default=None) or "Asia/Kolkata"
 USE_I18N = True
 USE_TZ = True
 
