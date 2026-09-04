@@ -30,15 +30,21 @@ env.read_env(os.path.join(BASE_DIR, ".env"), overwrite=False)
 # ========================================
 # CORE DJANGO SETTINGS
 # ========================================
-SECRET_KEY = env("SECRET_KEY")
-DEBUG = env("DEBUG")
-ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+SECRET_KEY = env("SECRET_KEY", default=None) or os.getenv("SECRET_KEY") or "rahul-hrms-production-cloud-secret-key-supabase-storage-2026-secure"
+DEBUG = env.bool("DEBUG", default=False if (os.getenv("VERCEL") or os.getenv("VERCEL_ENV")) else True)
+ALLOWED_HOSTS = env("ALLOWED_HOSTS", default=["*"])
+if isinstance(ALLOWED_HOSTS, str):
+    ALLOWED_HOSTS = [h.strip() for h in ALLOWED_HOSTS.split(",") if h.strip()]
+if not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ["*"]
 if os.getenv("VERCEL") or os.getenv("VERCEL_ENV"):
     if ".vercel.app" not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(".vercel.app")
     if "*" not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append("*")
-CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
+CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS", default=["https://*.vercel.app", "http://localhost:8000"])
+if isinstance(CSRF_TRUSTED_ORIGINS, str):
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in CSRF_TRUSTED_ORIGINS.split(",") if o.strip()]
 HORILLA_ENV = env("HORILLA_ENV", default="")
 REDIS_URL = env("REDIS_URL", default=None)
 
@@ -189,11 +195,16 @@ USE_SUPABASE_STORAGE = env.bool(
 # ========================================
 # DATABASE CONFIGURATION
 # ========================================
+DEFAULT_SUPABASE_DATABASE_URL = "postgresql://postgres.klfbbxsbzmdhfnsrmdui:NPCWdJo7JAUyzfzdvYeve1uF@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres?sslmode=require"
+
 raw_db_url = (
     env("DATABASE_URL", default=None)
     or env("SUPABASE_DATABASE_URL", default=None)
     or env("POSTGRES_URL", default=None)
     or env("POSTGRESQL_URL", default=None)
+    or os.getenv("DATABASE_URL")
+    or os.getenv("SUPABASE_DATABASE_URL")
+    or (DEFAULT_SUPABASE_DATABASE_URL if (os.getenv("VERCEL") or os.getenv("VERCEL_ENV")) else None)
 )
 
 if raw_db_url:
