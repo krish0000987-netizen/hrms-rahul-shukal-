@@ -5,7 +5,9 @@ Accessible at /dashboard/modern/ alongside the existing dashboard.
 """
 
 import json
+import time
 from datetime import date, timedelta
+from functools import wraps
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
@@ -14,6 +16,30 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_http_methods
+
+_CHECKLIST_CACHE = {}
+_DASHBOARD_JSON_CACHE = {}
+
+
+def dashboard_cache(ttl=45):
+    """Cache dashboard JSON responses in memory to prevent Vercel serverless connection thrashing."""
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            user_id = getattr(request.user, "id", 0)
+            company_id = request.session.get("selected_company", "default")
+            q_str = request.META.get("QUERY_STRING", "")
+            cache_key = f"{view_func.__name__}_{user_id}_{company_id}_{q_str}"
+            now = time.time()
+            entry = _DASHBOARD_JSON_CACHE.get(cache_key)
+            if entry and (now - entry["time"]) < ttl:
+                return HttpResponse(entry["content"], content_type="application/json")
+            resp = view_func(request, *args, **kwargs)
+            if getattr(resp, "status_code", 0) == 200:
+                _DASHBOARD_JSON_CACHE[cache_key] = {"content": resp.content, "time": now}
+            return resp
+        return wrapper
+    return decorator
 
 
 def _safe_url(url_name):
@@ -122,6 +148,13 @@ def _get_setup_checklist_context(request):
 
     # 2. Resolve the company we're scoping the checklist to
     company_pk = _resolve_checklist_company(request)
+    cache_key = f"{getattr(request.user, 'id', 0)}_{company_pk}"
+    now = time.time()
+
+    if not preview_mode:
+        cached = _CHECKLIST_CACHE.get(cache_key)
+        if cached and (now - cached["time"]) < 300:
+            return cached["val"]
 
     # 3. Check per-user, per-company dismissal
     if not preview_mode:
@@ -129,7 +162,9 @@ def _get_setup_checklist_context(request):
             user=request.user, company_id=company_pk
         ).exists()
         if dismissed:
-            return {"show_setup_checklist": False}
+            val = {"show_setup_checklist": False}
+            _CHECKLIST_CACHE[cache_key] = {"val": val, "time": now}
+            return val
 
     # 4. Build steps — each checks live DB scoped to the active company
     def _has_company():
@@ -236,7 +271,9 @@ def _get_setup_checklist_context(request):
 
     # Auto-hide once all steps are complete (no dismiss record needed)
     if not preview_mode and completed == total:
-        return {"show_setup_checklist": False}
+        val = {"show_setup_checklist": False}
+        _CHECKLIST_CACHE[cache_key] = {"val": val, "time": now}
+        return val
 
     # 6. Precompute connector-line state for the template.
     for i, step in enumerate(steps):
@@ -246,7 +283,7 @@ def _get_setup_checklist_context(request):
     next_step = next((s for s in steps if not s["done"]), None)
     progress_pct = int(completed / total * 100)
 
-    return {
+    res = {
         "show_setup_checklist": True,
         "setup_steps": steps,
         "setup_completed": completed,
@@ -256,6 +293,9 @@ def _get_setup_checklist_context(request):
         "setup_dismiss_url": _safe_url("dashboard-dismiss-setup-checklist"),
         "setup_company_pk": company_pk,
     }
+    if not preview_mode:
+        _CHECKLIST_CACHE[cache_key] = {"val": res, "time": now}
+    return res
 
 
 def _parse_period(request):
@@ -454,10 +494,13 @@ def dismiss_setup_checklist(request):
             user=request.user,
             company_id=company_pk,
         )
+        cache_key = f"{getattr(request.user, 'id', 0)}_{company_pk}"
+        _CHECKLIST_CACHE[cache_key] = {"val": {"show_setup_checklist": False}, "time": time.time()}
     return HttpResponse("")
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_kpi_data(request):
     """Return KPI summary data as JSON."""
     from employee.models import Employee
@@ -563,6 +606,7 @@ def dashboard_kpi_data(request):
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_attendance_trend(request):
     """Weekly attendance trend.
 
@@ -599,22 +643,29 @@ def dashboard_attendance_trend(request):
 
         bucket_start = from_date - timedelta(days=from_date.weekday())
         last_monday = to_date - timedelta(days=to_date.weekday())
-        while bucket_start <= last_monday:
-            week_end = min(bucket_start + timedelta(days=6), to_date)
-            week_start_q = max(bucket_start, from_date)
 
-            present_qs = Attendance.objects.filter(
-                attendance_date__gte=week_start_q,
-                attendance_date__lte=week_end,
+        # Single batch query for the entire date range
+        records = list(
+            Attendance.objects.filter(
+                attendance_date__gte=from_date,
+                attendance_date__lte=to_date,
                 employee_id__in=emp_qs,
-            )
-            present = present_qs.values("employee_id").distinct().count()
+            ).values_list("attendance_date", "employee_id")
+        )
+
+        curr = bucket_start
+        while curr <= last_monday:
+            week_end = min(curr + timedelta(days=6), to_date)
+            week_start_q = max(curr, from_date)
+
+            emp_in_week = {emp_id for att_date, emp_id in records if week_start_q <= att_date <= week_end}
+            present = len(emp_in_week)
             rate = min(100.0, round((present / total * 100), 1)) if total > 0 else 0
 
-            is_current = bucket_start <= today <= bucket_start + timedelta(days=6)
-            label = bucket_start.strftime("%b %d") + (" (now)" if is_current else "")
+            is_current = curr <= today <= curr + timedelta(days=6)
+            label = curr.strftime("%b %d") + (" (now)" if is_current else "")
             weeks.append({"week": label, "rate": rate, "present": present})
-            bucket_start += timedelta(weeks=1)
+            curr += timedelta(weeks=1)
     except Exception:
         weeks = [{"week": f"W{i+1}", "rate": 0, "present": 0} for i in range(12)]
 
@@ -622,6 +673,7 @@ def dashboard_attendance_trend(request):
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_leave_breakdown(request):
     """Leave type breakdown for the selected period.
 
@@ -666,6 +718,7 @@ def dashboard_leave_breakdown(request):
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_department_headcount(request):
     """Department-wise headcount."""
     departments = []
@@ -693,6 +746,7 @@ def dashboard_department_headcount(request):
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_gender_split(request):
     """Gender distribution."""
     genders = []
@@ -734,6 +788,7 @@ def dashboard_gender_split(request):
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_announcements(request):
     """Active announcements for the current user."""
     from base.models import Announcement
@@ -825,6 +880,7 @@ def dashboard_announcement_detail(request, pk):
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_todays_leave(request):
     """Employees on leave today.
 
@@ -880,6 +936,7 @@ def dashboard_todays_leave(request):
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_upcoming_holidays(request):
     """Upcoming holidays in the next 7 days for the current company."""
     today = date.today()
@@ -987,6 +1044,7 @@ def dashboard_birthdays_anniversaries(request):
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_recruitment_pipeline(request):
     """Recruitment pipeline funnel — candidates aggregated by stage type.
 
@@ -1068,6 +1126,7 @@ def dashboard_recruitment_pipeline(request):
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_payroll_summary(request):
     """Payroll summary — selected period vs previous period.
 
@@ -1145,6 +1204,7 @@ def dashboard_payroll_summary(request):
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_pending_approvals(request):
     """Pending items awaiting the logged-in user's approval.
 
@@ -1386,6 +1446,7 @@ def load_dashboard_prefs(request):
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_turnover(request):
     """Employee turnover — new hires vs exits over the last 6 months ending at selected period.
 
@@ -1483,6 +1544,7 @@ def dashboard_turnover(request):
 
 
 @login_required
+@dashboard_cache(ttl=45)
 def dashboard_leave_coverage(request):
     """Next-7-day leave coverage: headcount on approved leave per day + today by dept.
 
@@ -1506,15 +1568,22 @@ def dashboard_leave_coverage(request):
         active_total = emp_qs.count()
         active_ids = set(emp_qs.values_list("id", flat=True))
 
+        end_window = today + timedelta(days=6)
+        all_leaves_qs = LeaveRequest.objects.filter(
+            start_date__lte=end_window,
+            status="approved",
+        ).filter(Q(end_date__gte=today) | Q(end_date__isnull=True))
+        if scoped_ids is not None:
+            all_leaves_qs = all_leaves_qs.filter(employee_id__in=scoped_ids)
+        leave_spans = list(all_leaves_qs.values_list("employee_id", "start_date", "end_date"))
+
         for offset in range(7):
             day = today + timedelta(days=offset)
-            leave_qs = LeaveRequest.objects.filter(
-                start_date__lte=day,
-                status="approved",
-            ).filter(Q(end_date__gte=day) | Q(end_date__isnull=True, start_date=day))
-            if scoped_ids is not None:
-                leave_qs = leave_qs.filter(employee_id__in=scoped_ids)
-            on_leave = leave_qs.values("employee_id").distinct().count()
+            on_leave_emps = {
+                emp_id for emp_id, s_date, e_date in leave_spans
+                if s_date <= day and (e_date is None or e_date >= day)
+            }
+            on_leave = len(on_leave_emps)
             coverage_pct = (
                 round(((active_total - on_leave) / active_total) * 100, 1)
                 if active_total > 0
@@ -1578,8 +1647,19 @@ def dashboard_leave_coverage(request):
 
 def _call_module_json(view_callable, request):
     """Invoke a module chart view; always return JsonResponse-compatible output."""
+    user_id = getattr(request.user, "id", 0)
+    company_id = request.session.get("selected_company", "default")
+    q_str = request.META.get("QUERY_STRING", "")
+    cache_key = f"mod_{view_callable.__name__}_{user_id}_{company_id}_{q_str}"
+    now = time.time()
+    entry = _DASHBOARD_JSON_CACHE.get(cache_key)
+    if entry and (now - entry["time"]) < 45:
+        return HttpResponse(entry["content"], content_type="application/json")
     try:
-        return view_callable(request)
+        resp = view_callable(request)
+        if getattr(resp, "status_code", 0) == 200:
+            _DASHBOARD_JSON_CACHE[cache_key] = {"content": resp.content, "time": now}
+        return resp
     except Exception as exc:
         return JsonResponse({"error": str(exc), "no_permission": True}, status=500)
 

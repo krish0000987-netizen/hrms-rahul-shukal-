@@ -25,6 +25,8 @@ def is_stagemanager(user):
     """
     This method is used to check the employee is stage or recruitment manager
     """
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return True
     try:
         cached = getattr(user, "_horilla_is_stagemanager", None)
         if cached is not None:
@@ -45,11 +47,15 @@ def is_any_manager(request):
     """
     This method is used to check the employee is stage or recruitment manager
     """
-    user = request.user
+    user = getattr(request, "user", None)
+    if not user or getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return True
     cached = getattr(user, "_horilla_is_any_manager", None)
     if cached is not None:
         return cached
-    employee = user.employee_get
+    employee = getattr(user, "employee_get", None)
+    if not employee:
+        return False
     result = (
         employee.stage_set.filter(is_active=True).exists()
         or employee.recruitment_set.exists()
@@ -65,6 +71,8 @@ def is_recruitmentmangers(user):
     """
     This method is used to check the employee is recruitment manager
     """
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return True
     try:
         cached = getattr(user, "_horilla_is_recruitmentmanager", None)
         if cached is not None:

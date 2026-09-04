@@ -1,4 +1,4 @@
-﻿{% extends "index.html" %}
+{% extends "index.html" %}
 {% load static i18n %}
 
 {% block content %}
@@ -1379,7 +1379,32 @@
                 if (!qs) return u;
                 return u + (u.indexOf('?') >= 0 ? '&' : '?') + qs;
             }
-            function fetchP(url) { return fetch(urlWithPeriod(url)); }
+            const _attFetchQueue = [];
+            let _runningAttFetches = 0;
+            const MAX_CONCURRENT_ATT = 3;
+
+            function queueAttFetch(url, options) {
+                return new Promise((resolve, reject) => {
+                    _attFetchQueue.push({ url, options, resolve, reject });
+                    _drainAttQueue();
+                });
+            }
+
+            function _drainAttQueue() {
+                while (_runningAttFetches < MAX_CONCURRENT_ATT && _attFetchQueue.length > 0) {
+                    const item = _attFetchQueue.shift();
+                    _runningAttFetches++;
+                    fetch(item.url, item.options)
+                        .then(res => item.resolve(res))
+                        .catch(err => item.reject(err))
+                        .finally(() => {
+                            _runningAttFetches--;
+                            _drainAttQueue();
+                        });
+                }
+            }
+
+            function fetchP(url) { return queueAttFetch(urlWithPeriod(url)); }
 
             function amSetPreset(p) {
                 const t = new Date(); let f, to;

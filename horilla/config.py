@@ -25,54 +25,60 @@ def import_method(accessibility):
     return accessibility_method
 
 
+import time
+
 ALL_MENUS = {}
+_MENUS_CACHE = {}
 
 
 def sidebar(request):
-
     base_dir_apps = get_apps_in_base_dir()
 
     if not request.user.is_anonymous:
         request.MENUS = []
         MENUS = request.MENUS
+        is_superuser = getattr(request.user, "is_superuser", False)
 
         for app in base_dir_apps:
             if apps.is_installed(app):
                 try:
-                    sidebar = importlib.import_module(app + ".sidebar")
-
+                    sidebar_mod = importlib.import_module(app + ".sidebar")
                 except Exception as e:
                     logger.error(e)
                     continue
 
-                if sidebar:
+                if sidebar_mod:
                     accessibility = None
-                    if getattr(sidebar, "ACCESSIBILITY", None):
-                        accessibility = import_method(sidebar.ACCESSIBILITY)
+                    if not is_superuser and getattr(sidebar_mod, "ACCESSIBILITY", None):
+                        accessibility = import_method(sidebar_mod.ACCESSIBILITY)
 
-                    if hasattr(sidebar, "MENU") and (
-                        not accessibility
+                    if hasattr(sidebar_mod, "MENU") and (
+                        is_superuser
+                        or not accessibility
                         or accessibility(
                             request,
-                            sidebar.MENU,
+                            sidebar_mod.MENU,
                             PermWrapper(request.user),
                         )
                     ):
                         MENU = {}
-                        MENU["menu"] = sidebar.MENU
+                        MENU["menu"] = sidebar_mod.MENU
                         MENU["app"] = app
-                        MENU["img_src"] = sidebar.IMG_SRC
+                        MENU["img_src"] = sidebar_mod.IMG_SRC
                         MENU["submenu"] = []
                         MENUS.append(MENU)
-                        for submenu in sidebar.SUBMENUS:
-
-                            accessibility = None
-
-                            if submenu.get("accessibility"):
-                                accessibility = import_method(submenu["accessibility"])
+                        for submenu in sidebar_mod.SUBMENUS:
                             redirect: str = submenu["redirect"]
                             redirect = redirect.split("?")
                             submenu["redirect"] = redirect[0]
+
+                            if is_superuser:
+                                MENU["submenu"].append(submenu)
+                                continue
+
+                            accessibility = None
+                            if submenu.get("accessibility"):
+                                accessibility = import_method(submenu["accessibility"])
 
                             if not accessibility or accessibility(
                                 request,
@@ -80,7 +86,10 @@ def sidebar(request):
                                 PermWrapper(request.user),
                             ):
                                 MENU["submenu"].append(submenu)
-        ALL_MENUS[request.session.session_key] = MENUS
+        session = getattr(request, "session", None)
+        session_key = getattr(session, "session_key", None) if session else None
+        if session_key:
+            ALL_MENUS[session_key] = MENUS
 
 
 def get_MENUS(request):
@@ -88,14 +97,27 @@ def get_MENUS(request):
     cached = getattr(request, "_horilla_menus", None)
     if cached is not None:
         return {"sidebar": cached}
-    user_id = getattr(getattr(request, "user", None), "id", None)
-    cache_key = f"user_{user_id}" if user_id else getattr(request.session, "session_key", "anon")
-    if cache_key in ALL_MENUS and ALL_MENUS[cache_key]:
-        request._horilla_menus = ALL_MENUS[cache_key]
-        return {"sidebar": ALL_MENUS[cache_key]}
+    user = getattr(request, "user", None)
+    if not user or getattr(user, "is_anonymous", True):
+        return {"sidebar": []}
+
+    user_id = getattr(user, "id", None)
+    session = getattr(request, "session", None)
+    session_key = getattr(session, "session_key", None) if session else None
+    cache_key = f"user_{user_id}" if user_id else (session_key or "anon")
+
+    now = time.time()
+    if cache_key in _MENUS_CACHE:
+        ts, cached_menus = _MENUS_CACHE[cache_key]
+        if (now - ts) < 300:  # 5 min cache
+            request._horilla_menus = cached_menus
+            return {"sidebar": cached_menus}
+
     sidebar(request)
-    session_key = getattr(request.session, "session_key", None)
-    menus = ALL_MENUS.get(session_key) if session_key else request.MENUS
+    menus = getattr(request, "MENUS", [])
+    if not menus and session_key and session_key in ALL_MENUS:
+        menus = ALL_MENUS[session_key]
+    _MENUS_CACHE[cache_key] = (now, menus)
     ALL_MENUS[cache_key] = menus
     request._horilla_menus = menus
     return {"sidebar": menus}

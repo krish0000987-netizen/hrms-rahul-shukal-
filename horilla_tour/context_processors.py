@@ -8,8 +8,11 @@ done lazily by the JS controller via the ``tour-active`` API.
 """
 
 import logging
+import time
 
 logger = logging.getLogger(__name__)
+
+_TOURS_CACHE = {"has_published": None, "checked_at": 0}
 
 
 def pending_tours_flag(request):
@@ -19,13 +22,17 @@ def pending_tours_flag(request):
         return {"tour_launcher_enabled": False, "tour_has_pending": False}
 
     has_pending = False
+    now = time.time()
     try:
         from horilla_tour.models import Tour, TourProgress
 
-        # Published tours visible to the user's company (+ global) that are
-        # auto-start and not yet completed/skipped by this user.
-        published = Tour.objects.filter(is_active=True, is_published=True)
-        if published.exists():
+        # Cache whether any published tours exist (valid for 5 minutes)
+        if _TOURS_CACHE["has_published"] is None or now - _TOURS_CACHE["checked_at"] > 300:
+            _TOURS_CACHE["has_published"] = Tour.objects.filter(is_active=True, is_published=True).exists()
+            _TOURS_CACHE["checked_at"] = now
+
+        if _TOURS_CACHE["has_published"]:
+            published = Tour.objects.filter(is_active=True, is_published=True)
             done_ids = set(
                 TourProgress.objects.filter(
                     user=user, status__in=["completed", "skipped"]

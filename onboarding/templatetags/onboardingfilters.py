@@ -25,12 +25,21 @@ def is_taskmanager(user):
     Returns:
         bool: True if task manager
     """
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return True
+    cached = getattr(user, "_horilla_is_taskmanager", None)
+    if cached is not None:
+        return cached
     try:
-        employee = user.employee_get
-        return (
+        employee = getattr(user, "employee_get", None)
+        if not employee:
+            return False
+        result = (
             employee.onboardingstage_set.all().exists()
             or employee.onboarding_task.all().exists()
         )
+        setattr(user, "_horilla_is_taskmanager", result)
+        return result
     except Exception:
         return False
 

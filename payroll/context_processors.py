@@ -9,17 +9,31 @@ from payroll.models import tax_models as models
 from payroll.models.models import Deduction
 
 
+_PAYROLL_SETTINGS_CACHE = {"obj": None, "cached_at": 0}
+
+
 def default_currency(request):
     """
     This method will return the currency
     """
-    if models.PayrollSettings.objects.first() is None:
-        settings = models.PayrollSettings()
-        settings.currency_symbol = "$"
-        settings.company_id = getattr(request, "selected_company_instance", None)
-        settings.save()
-    symbol = models.PayrollSettings.objects.first().currency_symbol
-    position = models.PayrollSettings.objects.first().position
+    import time
+    now = time.time()
+    ps = _PAYROLL_SETTINGS_CACHE["obj"]
+    if ps is None or now - _PAYROLL_SETTINGS_CACHE["cached_at"] > 300:
+        ps = models.PayrollSettings.objects.first()
+        if ps is None:
+            ps = models.PayrollSettings()
+            ps.currency_symbol = "$"
+            ps.company_id = getattr(request, "selected_company_instance", None)
+            try:
+                ps.save()
+            except Exception:
+                pass
+        _PAYROLL_SETTINGS_CACHE["obj"] = ps
+        _PAYROLL_SETTINGS_CACHE["cached_at"] = now
+
+    symbol = getattr(ps, "currency_symbol", "$")
+    position = getattr(ps, "position", "prefix")
     return {
         "currency": request.session.get("currency", symbol),
         "position": request.session.get("position", position),

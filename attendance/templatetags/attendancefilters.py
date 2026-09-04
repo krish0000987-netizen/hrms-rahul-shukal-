@@ -71,10 +71,14 @@ def is_clocked_in(user):
     args:
         user    : request.user
     """
-
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if hasattr(user, "_is_clocked_in_cache"):
+        return user._is_clocked_in_cache
     try:
         employee = user.employee_get
-    except:
+    except Exception:
+        user._is_clocked_in_cache = False
         return False
     today = date.today()
     yesterday = today - timedelta(days=1)
@@ -91,7 +95,10 @@ def is_clocked_in(user):
             .order_by("id")
             .last()
         )
-        return False if last_activity is None else last_activity.clock_out is None
+        res = False if last_activity is None else last_activity.clock_out is None
+        user._is_clocked_in_cache = res
+        return res
+    user._is_clocked_in_cache = False
     return False
 
 

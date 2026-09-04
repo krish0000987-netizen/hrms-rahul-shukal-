@@ -1,4 +1,4 @@
-﻿{% extends "index.html" %}
+{% extends "index.html" %}
 {% load static i18n %}
 
 {% block content %}
@@ -2261,8 +2261,35 @@
                 location.assign(newUrl);
             }
 
+            // Concurrency-limited fetch queue (max 3 concurrent) to prevent serverless connection starvation
+            const _dashboardFetchQueue = [];
+            let _runningFetches = 0;
+            const MAX_CONCURRENT_FETCHES = 3;
+
+            function queueFetch(url, options) {
+                return new Promise((resolve, reject) => {
+                    _dashboardFetchQueue.push({ url, options, resolve, reject });
+                    _drainFetchQueue();
+                });
+            }
+
+            function _drainFetchQueue() {
+                while (_runningFetches < MAX_CONCURRENT_FETCHES && _dashboardFetchQueue.length > 0) {
+                    const item = _dashboardFetchQueue.shift();
+                    _runningFetches++;
+                    fetch(item.url, item.options)
+                        .then(res => item.resolve(res))
+                        .catch(err => item.reject(err))
+                        .finally(() => {
+                            _runningFetches--;
+                            _drainFetchQueue();
+                        });
+                }
+            }
+
             // Helper: fetch with period params for period-sensitive endpoints
-            function fetchP(url) { return fetch(urlWithPeriod(url)); }
+            function fetchP(url) { return queueFetch(urlWithPeriod(url)); }
+            function fetchQ(url, options) { return queueFetch(url, options); }
 
             // ── Chart instance registry ──
             // ApexCharts.render() always appends a new SVG into the target
@@ -2359,7 +2386,7 @@
 
             // ─── ANNOUNCEMENTS ───
             function loadAnnouncements() {
-                fetch("{% url 'dashboard-announcements' %}")
+                fetchQ("{% url 'dashboard-announcements' %}")
                     .then(r => r.json())
                     .then(data => {
                         const el = document.getElementById('md-announcements');
@@ -2391,7 +2418,7 @@
 
             // ─── TODAY'S LEAVE ───
             function loadTodaysLeave() {
-                fetch("{% url 'dashboard-todays-leave' %}")
+                fetchQ("{% url 'dashboard-todays-leave' %}")
                 .then(r => r.json())
                 .then(data => {
                     const el = document.getElementById('md-todays-leave');
@@ -2486,7 +2513,7 @@
 
             // ─── DEPARTMENT HEADCOUNT ───
             function loadDepartmentHeadcount() {
-                fetch("{% url 'dashboard-department-headcount' %}")
+                fetchQ("{% url 'dashboard-department-headcount' %}")
                 .then(r => r.json())
                 .then(data => {
                     if (!data.departments.length) { document.querySelector("#chart-departments").innerHTML = emptyHtml('{% trans "No department data" %}'); return; }
@@ -2517,7 +2544,7 @@
 
             // ─── GENDER ───
             function loadGenderSplit() {
-                fetch("{% url 'dashboard-gender-split' %}")
+                fetchQ("{% url 'dashboard-gender-split' %}")
                 .then(r => r.json())
                 .then(data => {
                     if (!data.genders.length) { document.querySelector("#chart-gender").innerHTML = emptyHtml('{% trans "No data" %}'); return; }
@@ -2587,7 +2614,7 @@
             // ─── EMPLOYEE STATUS ───
             // Donut (not radialBar): API returns absolute headcounts; radialBar treats series as 0–100%.
             function loadEmployeeStatus() {
-                fetch("{% url 'dashboard-employee-status' %}")
+                fetchQ("{% url 'dashboard-employee-status' %}")
                 .then(r => r.json())
                 .then(data => {
                     if (!data.dataSet || !data.dataSet.length) { document.querySelector("#chart-employee-status").innerHTML = emptyHtml('{% trans "No data" %}'); return; }
@@ -2623,7 +2650,7 @@
             {% if perms.attendance.view_attendance or request.user.is_superuser %}
             // ─── ATTENDANCE OVERVIEW ───
             function loadAttendanceOverview() {
-                fetch("{% url 'dashboard-attendance-overview' %}")
+                fetchQ("{% url 'dashboard-attendance-overview' %}")
                 .then(r => r.json())
                 .then(data => {
                     if (data.no_permission) { hideCard('attendance_overview'); return; }
@@ -2659,7 +2686,7 @@
 
             // ─── DEPARTMENT OVERTIME ───
             function loadDepartmentOvertime() {
-                fetch("{% url 'dashboard-department-overtime' %}")
+                fetchQ("{% url 'dashboard-department-overtime' %}")
                 .then(r => r.json())
                 .then(data => {
                     if (data.no_permission) { hideCard('department_overtime'); return; }
@@ -2684,7 +2711,7 @@
             {% if perms.leave.view_leaverequest or request.user.is_superuser %}
             // ─── LEAVE OVER PERIOD ───
             function loadLeaveOverPeriod() {
-                fetch("{% url 'dashboard-leave-trends' %}")
+                fetchQ("{% url 'dashboard-leave-trends' %}")
                 .then(r => r.json())
                 .then(data => {
                     if (data.no_permission) { hideCard('leave_trends'); return; }
@@ -2712,7 +2739,7 @@
             {% if perms.recruitment.view_recruitment or request.user.is_superuser %}
             // ─── RECRUITMENT PIPELINE ───
             function loadRecruitmentPipeline() {
-                fetch("{% url 'dashboard-recruitment-by-stage' %}?_t=" + Date.now())
+                fetchQ("{% url 'dashboard-recruitment-by-stage' %}?_t=" + Date.now())
                 .then(r => {
                     const ct = r.headers.get('content-type') || '';
                     if (!r.ok || !ct.includes('application/json')) {
@@ -2758,7 +2785,7 @@
 
             // ─── HIRING TIMELINE ───
             function loadHiringTimeline() {
-                fetch("{% url 'dashboard-hiring-timeline' %}")
+                fetchQ("{% url 'dashboard-hiring-timeline' %}")
                 .then(r => {
                     const ct = r.headers.get('content-type') || '';
                     if (!r.ok || !ct.includes('application/json')) {
@@ -2840,7 +2867,7 @@
             loadLeaveCoverage();
 
             function loadLeaveByDepartment() {
-                fetch("{% url 'dashboard-leave-by-department' %}")
+                fetchQ("{% url 'dashboard-leave-by-department' %}")
                 .then(r => r.json())
                 .then(data => {
                     if (data.no_permission) { hideCard('leave_by_department'); return; }
@@ -2870,7 +2897,7 @@
 
             // ─── DEPARTMENT LEAVE DAYS ───
             function loadDepartmentLeaveDays() {
-                fetch("{% url 'dashboard-department-leave-days' %}")
+                fetchQ("{% url 'dashboard-department-leave-days' %}")
                 .then(r => r.json())
                 .then(data => {
                     if (data.no_permission) { hideCard('department_leave_days'); return; }
@@ -2895,7 +2922,7 @@
 
             // ─── UPCOMING HOLIDAYS ───
             function loadUpcomingHolidays() {
-                fetch("{% url 'dashboard-upcoming-holidays' %}")
+                fetchQ("{% url 'dashboard-upcoming-holidays' %}")
                 .then(r => r.json())
                 .then(data => {
                     const el = document.getElementById('md-holidays');
@@ -2928,7 +2955,7 @@
 
             // ─── BIRTHDAYS & ANNIVERSARIES ───
             function loadBirthdaysAnniversaries() {
-                fetch("{% url 'dashboard-birthdays-anniversaries' %}")
+                fetchQ("{% url 'dashboard-birthdays-anniversaries' %}")
                 .then(r => r.json())
                 .then(data => {
                     const el = document.getElementById('md-birthdays');
@@ -3032,7 +3059,7 @@
             {% if perms.recruitment.view_recruitment or request.user.is_superuser %}
             // ─── RECRUITMENT FUNNEL (HTML stage funnel — share of candidates) ───
             function loadRecruitmentFunnel() {
-                fetch("{% url 'dashboard-recruitment-pipeline' %}?_t=" + Date.now())
+                fetchQ("{% url 'dashboard-recruitment-pipeline' %}?_t=" + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     const el = document.querySelector("#chart-recruitment-funnel");

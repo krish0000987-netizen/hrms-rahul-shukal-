@@ -6,6 +6,7 @@ This module is used to write custom template filters.
 """
 
 import base64
+import time
 from datetime import date, datetime, timedelta
 from itertools import groupby
 
@@ -23,6 +24,10 @@ from horilla.methods import get_horilla_model_class
 from horilla_theme.models import CompanyTheme, HorillaColorTheme
 
 register = template.Library()
+
+_THEME_CACHE = {}
+_ATT_SETTINGS_CACHE = {}
+_PAYROLL_SETTINGS_CACHE = {}
 
 
 @register.filter(name="is_string")
@@ -79,10 +84,14 @@ def is_clocked_in(user):
     args:
         user    : request.user
     """
-
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if hasattr(user, "_is_clocked_in_cache"):
+        return user._is_clocked_in_cache
     try:
         employee = user.employee_get
-    except:
+    except Exception:
+        user._is_clocked_in_cache = False
         return False
     if apps.is_installed("attendance"):
         last_attendance = (
@@ -93,9 +102,14 @@ def is_clocked_in(user):
                 attendance_date=last_attendance.attendance_date
             ).last()
             if not last_activity:
+                user._is_clocked_in_cache = False
                 return False
-            return last_activity.clock_out is None
+            res = last_activity.clock_out is None
+            user._is_clocked_in_cache = res
+            return res
+        user._is_clocked_in_cache = True
         return True
+    user._is_clocked_in_cache = False
     return False
 
 
@@ -317,15 +331,23 @@ def on_off(value):
 
 @register.filter(name="currency_symbol_position")
 def currency_symbol_position(amount):
-    if apps.is_installed("payroll"):
-        PayrollSettings = get_horilla_model_class(
-            app_label="payroll", model="payrollsettings"
-        )
-    symbol = PayrollSettings.objects.first()
+    now = time.time()
+    cached = _PAYROLL_SETTINGS_CACHE.get("currency")
+    if cached and (now - cached[0]) < 300:
+        symbol = cached[1]
+    else:
+        symbol = None
+        if apps.is_installed("payroll"):
+            PayrollSettings = get_horilla_model_class(
+                app_label="payroll", model="payrollsettings"
+            )
+            if PayrollSettings:
+                symbol = PayrollSettings.objects.first()
+        _PAYROLL_SETTINGS_CACHE["currency"] = (now, symbol)
 
     currency = symbol.currency_symbol if symbol else "$"
 
-    if symbol.position == "postfix":
+    if symbol and symbol.position == "postfix":
         currency_symbol = f"{amount} {currency}"
     else:
         currency_symbol = f"{currency} {amount}"
@@ -338,13 +360,27 @@ def is_check_in_enabled(request):
     """
     This method checks whether the check-in/check-out feature is enabled.
     """
+    if hasattr(request, "_is_check_in_enabled_cache"):
+        return request._is_check_in_enabled_cache
+    if not apps.is_installed("attendance"):
+        request._is_check_in_enabled_cache = False
+        return False
     from attendance.models import AttendanceGeneralSetting
 
-    selected_company = request.session.get("selected_company")
+    session = getattr(request, "session", None)
+    selected_company = session.get("selected_company") if session else None
     if not selected_company:
-        return False  # Safeguard if session key is missing
+        request._is_check_in_enabled_cache = False
+        return False
 
-    # Fetch the settings based on the selected company
+    now = time.time()
+    cache_key = f"checkin_{selected_company}"
+    if cache_key in _ATT_SETTINGS_CACHE:
+        ts, res = _ATT_SETTINGS_CACHE[cache_key]
+        if (now - ts) < 300:
+            request._is_check_in_enabled_cache = res
+            return res
+
     if selected_company == "all":
         attendance_settings = AttendanceGeneralSetting.objects.filter(
             company_id=None
@@ -352,30 +388,41 @@ def is_check_in_enabled(request):
     else:
         company = Company.objects.filter(id=selected_company).first()
         if not company:
-            return False  # Return False if the company doesn't exist
+            request._is_check_in_enabled_cache = False
+            return False
         attendance_settings = AttendanceGeneralSetting.objects.filter(
             company_id=company
         ).first()
 
-    # Check if check-in is enabled
-    return bool(attendance_settings and attendance_settings.enable_check_in)
+    result = bool(attendance_settings and attendance_settings.enable_check_in)
+    _ATT_SETTINGS_CACHE[cache_key] = (now, result)
+    request._is_check_in_enabled_cache = result
+    return result
 
 
 @register.filter(name="is_timerunner_enabled")
 def is_timerunner_enabled(request):
     """
     Whether the navbar at-work timer should run for this request.
-
-    Uses the selected company when one is chosen; when the switcher is on
-    "all", uses the logged-in employee's company (the Check-In/Out control is
-    personal). Falls back to the global (company_id=None) row, then True.
     """
-    from attendance.models import AttendanceGeneralSetting
-
+    if hasattr(request, "_is_timerunner_enabled_cache"):
+        return request._is_timerunner_enabled_cache
     if not apps.is_installed("attendance"):
         return True
+    from attendance.models import AttendanceGeneralSetting
 
-    selected_company = request.session.get("selected_company")
+    session = getattr(request, "session", None)
+    selected_company = session.get("selected_company") if session else None
+    company_key = selected_company if selected_company and selected_company != "all" else "global"
+
+    now = time.time()
+    cache_key = f"timerunner_{company_key}"
+    if cache_key in _ATT_SETTINGS_CACHE:
+        ts, res = _ATT_SETTINGS_CACHE[cache_key]
+        if (now - ts) < 300:
+            request._is_timerunner_enabled_cache = res
+            return res
+
     company = None
     if selected_company and selected_company != "all":
         company = Company.objects.filter(id=selected_company).first()
@@ -388,9 +435,10 @@ def is_timerunner_enabled(request):
     setting = AttendanceGeneralSetting.objects.filter(company_id=company).first()
     if not setting:
         setting = AttendanceGeneralSetting.objects.filter(company_id=None).first()
-    if setting is None:
-        return True
-    return bool(setting.time_runner)
+    result = True if setting is None else bool(setting.time_runner)
+    _ATT_SETTINGS_CACHE[cache_key] = (now, result)
+    request._is_timerunner_enabled_cache = result
+    return result
 
 
 @register.filter
@@ -403,14 +451,24 @@ def verbose_name(instance, field_name):
 
 
 def _resolve_company_theme(company_id):
+    now = time.time()
+    cache_key = f"theme_{company_id}"
+    if cache_key in _THEME_CACHE:
+        ts, theme = _THEME_CACHE[cache_key]
+        if (now - ts) < 300:
+            return theme
+
+    theme = None
     if company_id is not None and company_id != "all":
         company = Company.objects.filter(id=company_id).first()
-        theme = CompanyTheme.objects.filter(company=company).first()
-        if theme:
-            return HorillaColorTheme.objects.filter(id=theme.theme.id).first()
-        else:
-            return HorillaColorTheme.objects.filter(is_default=True).first()
-    return HorillaColorTheme.objects.filter(is_default=True).first()
+        comp_theme = CompanyTheme.objects.filter(company=company).first()
+        if comp_theme and comp_theme.theme:
+            theme = HorillaColorTheme.objects.filter(id=comp_theme.theme.id).first()
+    if not theme:
+        theme = HorillaColorTheme.objects.filter(is_default=True).first()
+
+    _THEME_CACHE[cache_key] = (now, theme)
+    return theme
 
 
 @register.simple_tag(takes_context=True)

@@ -10,10 +10,16 @@ register = Library()
 
 @register.simple_tag(takes_context=True)
 def notifications_unread(context):
+    request = context.get("request")
+    if hasattr(request, "_notifications_unread_cache"):
+        return request._notifications_unread_cache
     user = user_context(context)
     if not user:
         return ""
-    return user.notifications.unread().count()
+    count = user.notifications.unread().count()
+    if request:
+        request._notifications_unread_cache = count
+    return count
 
 
 @register.filter
@@ -71,14 +77,21 @@ var notify_refresh_period = {};
 
 @register.simple_tag(takes_context=True)
 def live_notify_badge(context, *args, badge_class="live_notify_badge", **kwargs):
-    user = user_context(context)
-    if not user:
-        return ""
+    request = context.get("request")
+    if hasattr(request, "_notifications_unread_cache"):
+        count = request._notifications_unread_cache
+    else:
+        user = user_context(context)
+        if not user:
+            return ""
+        count = user.notifications.unread().count()
+        if request:
+            request._notifications_unread_cache = count
 
     return format_html(
         "<span class='{}'>{}</span>",
         badge_class,
-        user.notifications.unread().count(),
+        count,
     )
 
 
