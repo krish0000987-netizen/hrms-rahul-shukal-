@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+media
+pg_backup
+*.sqlite3
+perm_baseline.json
+docker
+Dockerfile
+docker-compose*.yml
+*.md
+Makefile
+load_data
+.env*
+!base/management/commands/createrahuluser.py

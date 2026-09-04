@@ -29,7 +29,6 @@ XlsxWriter
 
 # PDF handling
 pdfkit
-PyMuPDF
 reportlab==4.0.9
 xhtml2pdf
 
@@ -41,7 +40,6 @@ requests-oauthlib
 # Google integration
 google-api-python-client
 google-auth-oauthlib
-google-cloud-storage==3.0.0
 
 # Geolocation
 geopy
