@@ -54,7 +54,7 @@
                                 id="username"
                                 name="username"
                                 class="oh-input w-100"
-                                placeholder="{% trans 'e.g. adam.luis@horilla.com' %}"
+                                placeholder="{% trans 'e.g. admin@rahulhrms.com' %}"
                             >
                         </div>
                         <div class="oh-input-group">
@@ -65,7 +65,7 @@
                                     id="password"
                                     name="password"
                                     class="oh-input oh-input--password w-100"
-                                    placeholder="{% trans 'Use alphanumeric characters' %}"
+                                    placeholder="{% trans 'Enter your password' %}"
                                 >
                                 <button type="button" class="oh-btn oh-btn--transparent oh-password-input--toggle">
                                     <ion-icon
@@ -139,13 +139,9 @@
                 </div>
                 <div style="display: contents">
                     <img
-                        src="{% if white_label_company.icon %}
-                        "{{white_label_company.icon.url}}"
+                        src="{% if white_label_company.icon %}{{white_label_company.icon.url}}{% else %}{% static 'images/ui/rahul-hrms-logo.png' %}{% endif %}"
                         alt="{{white_label_company_name}}"
-                        style=" opacity:.90; 200px; height: 140px;"
-                    {% else %}
-                        "{% static 'images/ui/auth-logo.png' %}" alt="{% trans 'Horilla' %}"
-                    {% endif %}"
+                        style="opacity:.95; max-width: 220px; height: auto;"
                     >
                     {% if white_label_company %}
                         <p style="font-size: large; color: gray; text-align: center" class="mt-2">

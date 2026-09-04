@@ -25,7 +25,7 @@ env = environ.Env(
 )
 
 # Existing process environment (Compose, systemd, CI) wins over .env values.
-env.read_env(os.path.join(BASE_DIR, ".env"), overwrite=False)
+env.read_env(os.path.join(BASE_DIR, ".env"), overwrite=True)
 
 # ========================================
 # CORE DJANGO SETTINGS
@@ -36,6 +36,11 @@ ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
 HORILLA_ENV = env("HORILLA_ENV", default="")
 REDIS_URL = env("REDIS_URL", default=None)
+
+# Application Branding
+APP_NAME = env("APP_NAME", default="Rahul HRMS")
+APP_SUBTITLE = env("APP_SUBTITLE", default="Human Resource Management System")
+DOC_BASE_URL = env("DOC_BASE_URL", default="#")
 
 # Default site ID for django.contrib.sites framework.
 SITE_ID = 1
@@ -163,10 +168,40 @@ MIDDLEWARE = [
 ROOT_URLCONF = "horilla.urls"
 
 # ========================================
+# SUPABASE CONFIGURATION
+# ========================================
+SUPABASE_URL = env("SUPABASE_URL", default="")
+SUPABASE_PUBLISHABLE_KEY = env("SUPABASE_PUBLISHABLE_KEY", default="")
+SUPABASE_ANON_KEY = env("SUPABASE_ANON_KEY", default=env("SUPABASE_PUBLISHABLE_KEY", default=""))
+SUPABASE_SECRET_KEY = env("SUPABASE_SECRET_KEY", default="")
+SUPABASE_SERVICE_ROLE_KEY = env("SUPABASE_SERVICE_ROLE_KEY", default=env("SUPABASE_SECRET_KEY", default=""))
+SUPABASE_STORAGE_BUCKET = env("SUPABASE_STORAGE_BUCKET", default="rahul-hrms")
+USE_SUPABASE_STORAGE = env.bool(
+    "USE_SUPABASE_STORAGE",
+    default=bool(SUPABASE_URL and (SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY or SUPABASE_ANON_KEY)),
+)
+
+# ========================================
 # DATABASE CONFIGURATION
 # ========================================
-if env("DATABASE_URL", default=None):
-    DATABASES = {"default": env.db()}
+if env("DATABASE_URL", default=None) or env("SUPABASE_DATABASE_URL", default=None):
+    db_url = env("DATABASE_URL", default=None) or env("SUPABASE_DATABASE_URL")
+    DATABASES = {"default": env.db_url_config(db_url)}
+elif env("SUPABASE_DB_HOST", default=None):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("SUPABASE_DB_NAME", default="postgres"),
+            "USER": env("SUPABASE_DB_USER", default="postgres"),
+            "PASSWORD": env("SUPABASE_DB_PASSWORD", default=""),
+            "HOST": env("SUPABASE_DB_HOST"),
+            "PORT": env("SUPABASE_DB_PORT", default="5432"),
+            "OPTIONS": {
+                "connect_timeout": 15,
+                "sslmode": env("DB_SSLMODE", default="require"),
+            },
+        }
+    }
 else:
     DATABASES = {
         "default": {
@@ -212,7 +247,7 @@ if REDIS_URL:
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
             },
-            "KEY_PREFIX": "horilla",
+            "KEY_PREFIX": "rahul_hrms",
         }
     }
 
@@ -226,6 +261,17 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media/")
+
+if USE_SUPABASE_STORAGE:
+    DEFAULT_FILE_STORAGE = "horilla.supabase_storage.SupabaseStorage"
+    STORAGES = {
+        "default": {
+            "BACKEND": "horilla.supabase_storage.SupabaseStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+        },
+    }
 
 # ========================================
 # AUTHENTICATION & SECURITY

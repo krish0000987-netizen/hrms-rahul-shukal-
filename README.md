@@ -1,192 +1,137 @@
-# Horilla HRMS
+# Rahul HRMS
 
-[![License: LGPL v2.1](https://img.shields.io/badge/License-LGPL%20v2.1-blue.svg)](https://www.gnu.org/licenses/lgpl-2.1)
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Django](https://img.shields.io/badge/django-5.0+-green.svg)](https://www.djangoproject.com/)
-[![Stars](https://img.shields.io/github/stars/horilla/horilla-hr)](https://github.com/horilla/horilla-hr/stargazers)
-[![Forks](https://img.shields.io/github/forks/horilla/horilla-hr)](https://github.com/horilla/horilla-hr/network/members)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
+[![Django](https://img.shields.io/badge/django-5.2+-green.svg)](https://www.djangoproject.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL%20%26%20Storage-emerald.svg)](https://supabase.com/)
+[![License: LGPL v2.1](https://img.shields.io/badge/License-LGPL%20v2.1-blue.svg)](LICENSE)
 
-> [!IMPORTANT]
-> **`2.0` is now this repository’s default branch.** Use it to run or deploy Horilla (a plain `git clone` checks it out). To contribute code, branch from and open PRs against `dev/v2.0` — GitHub still pre-selects `2.0` as the PR base, so switch it manually. v1 (`1.0`/`master`) is deprioritized, with fixes considered case-by-case rather than on a guaranteed schedule. Full details → [Discussion #1127](https://github.com/horilla/horilla-hr/discussions/1127).
+> **Rahul HRMS is a production-ready, cloud-native Human Resource Management System customized and powered by Supabase PostgreSQL and Supabase Storage.**
+> *Based on and customized from the open-source Horilla HRMS core architecture.*
 
-> **A comprehensive, free, and open-source Human Resource Management System (HRMS) designed to streamline HR operations and enhance organizational efficiency.**
+---
 
-## 🚀 Features
+## 🚀 Key Modules & Capabilities
 
-### Core HR Modules
-- 👥 **Employee Management** - Centralized workforce data with LDAP integration
-- 🎯 **Recruitment** - End-to-end hiring process from job posting to onboarding
-- 📋 **Onboarding & Offboarding** - Structured workflows for employee lifecycle
-- ⏰ **Attendance & Time Tracking** - Biometric integration and automated check-in/out
-- 🏖️ **Leave Management** - Policy enforcement, approvals, and balance tracking
-- 💰 **Payroll** - Automated salary processing, tax calculations, and compliance
-- 📊 **Performance Management** - Goal setting, reviews, and continuous feedback
-- 🏢 **Asset Management** - Track and manage company resources
-- 🎫 **Helpdesk** - Centralized HR support and ticketing system
+- 👥 **Workforce & Employee Management**: Complete employee profiles, bank details, work histories, departmental structures, reporting hierarchies, and document registries.
+- ⏰ **Attendance & Shift Scheduling**: Shift rotation, work type requests, biometric device integration, late come/early out tracking, and real-time attendance validation.
+- 🏖️ **Leave & Encashment**: Multi-level leave policy configurations, balance ledgers, compensatory leave workflows, holiday calendars, and encashment settings.
+- 🎯 **Recruitment & Applicant Tracking**: Interactive candidate pipelines, interview scheduling, automated surveys, and spaCy NLP resume parser.
+- 💰 **Payroll & Compensation**: Salary slips, customizable allowances, tax deductions, reimbursements, and automated payslip generation.
+- 📊 **Performance Management (PMS)**: 360-degree feedback, Key Results, Objectives & OKR tracking, and appraisal cycles.
+- 📁 **Cloud Media & Document Storage**: Full Supabase Storage integration with private buckets and signed secure URLs for sensitive HR documents, certifications, and contracts.
+- 📈 **Analytics & Reports**: Visual dashboards, exportable Excel/CSV datasets, and PDF summaries.
+- 🔐 **Enterprise Security & Permissions**: Role-based access control (RBAC), company-scoped authorization, session protection, and audit logging.
 
+---
 
-## 📋 Table of Contents
+## 🏗 System Architecture & Infrastructure
 
-- [Which Branch Do I Want?](#-which-branch-do-i-want)
-- [Quick Start](#-quick-start)
-- [Installation](#-installation)
-- [Deployment](#-deployment)
-- [Contributing](#-contributing)
-- [Security](#-security)
-- [Support](#-support)
-- [License](#-license)
+- **Backend Framework**: Django 5.2 (Python 3.12)
+- **Primary Relational Database**: Supabase PostgreSQL (PostgreSQL 17 via direct connection or PgBouncer Session/Transaction pooler)
+- **Cloud Object Storage**: Supabase Storage (`rahul-hrms` private bucket)
+- **Asynchronous Tasks & Scheduling**: APScheduler / Redis
+- **Security & Media**: WhiteNoise static file compression, signed token URLs for employee media
 
-## 🌳 Which Branch Do I Want?
+---
 
-- **`2.0`** (default) — the latest stable v2 snapshot. This is what a plain `git clone` gives you. Use it to run or deploy Horilla.
-- **`dev/v2.0`** — the active integration branch. If you want to contribute code, branch from and open PRs against this, not `2.0`.
-- **`1.0`/`master`** — v1, now deprioritized (fixes considered case-by-case, no guaranteed schedule). Not deleted, but no longer where active development happens.
+## ⚡ Quick Start & Local Setup
 
-See [Discussion #1127](https://github.com/horilla/horilla-hr/discussions/1127) for full background on this transition.
+### 1. Prerequisites
+- Python 3.11 or Python 3.12
+- Git
+- Access to Supabase Project (PostgreSQL database and Storage)
 
-## ⚡ Quick Start
+### 2. Clone the Repository
+```bash
+git clone https://github.com/krish0000987-netizen/hrms-rahul-shukal-.git
+cd hrms-rahul-shukal-
+```
 
-### Using Docker (Recommended)
+### 3. Setup Virtual Environment
+```bash
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 4. Configure Environment Variables
+Copy the template configuration file:
+```bash
+cp .env.example .env
+```
+Edit `.env` with your Supabase credentials and database connection details:
+```ini
+DEBUG=True
+SECRET_KEY=your-secure-django-secret-key
+ALLOWED_HOSTS=localhost,127.0.0.1,*
+TIME_ZONE=Asia/Kolkata
+
+# Supabase Credentials
+SUPABASE_URL=https://<your-project-ref>.supabase.co
+SUPABASE_PUBLISHABLE_KEY=<your-supabase-publishable-key>
+SUPABASE_SECRET_KEY=<your-supabase-secret-key>
+SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
+SUPABASE_STORAGE_BUCKET=rahul-hrms
+USE_SUPABASE_STORAGE=True
+
+# Supabase PostgreSQL Database Connection
+DATABASE_URL=postgresql://postgres.<project-ref>:<db-password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+### 5. Run Database Migrations
+Apply all schema migrations to your Supabase PostgreSQL database:
+```bash
+python manage.py migrate
+```
+
+### 6. Create Initial Admin User
+Create your Rahul HRMS superuser administrator:
+```bash
+python manage.py createrahuluser
+# or standard Django: python manage.py createsuperuser
+```
+
+### 7. Run the Development Server
+```bash
+python manage.py runserver 8000
+```
+Visit **[http://localhost:8000](http://localhost:8000)** in your browser and sign in.
+
+---
+
+## 🐳 Docker Deployment
+
+To run Rahul HRMS in production using Docker:
 
 ```bash
-# Clone the repository (defaults to the stable 2.0 branch)
-git clone https://github.com/horilla/horilla-hr.git
-cd horilla-hr
+# Build and run the containers
+docker-compose up -d --build
 
-# Start with Docker Compose
-docker-compose up -d
+# Run migrations inside the container
+docker-compose exec web python manage.py migrate
 
-# Access the application
+# Access the service
 open http://localhost:8000
 ```
 
-### Manual Installation
+---
 
+## 🧪 Testing & Verification
+
+Run Django system checks and automated test suites:
 ```bash
-# Clone and setup (defaults to the stable 2.0 branch)
-git clone https://github.com/horilla/horilla-hr.git
-cd horilla-hr
+# Verify system integrity
+python manage.py check
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Setup environment
-cp .env.dist .env
-# Edit .env with your configuration
-
-# Initialize database
-python manage.py migrate
-python manage.py compilemessages
-python manage.py collectstatic
-
-# Run development server
-python manage.py runserver
+# Run test suite
+python manage.py test base employee attendance leave payroll
 ```
 
+---
 
-## 🛠 Installation
+## 📄 License & Attribution
 
-For detailed installation instructions, configuration guides, and platform-specific setup instructions, please visit our comprehensive documentation:
-
-### 📖 [Complete Installation Guide → docs.horilla.com/technical/v2.0/ ](https://docs.horilla.com/technical/v2.0/)
-
-Our documentation includes:
-- **Step-by-step installation** for all supported platforms
-- **Database configuration** guides
-- **Environment setup** instructions
-- **Production deployment** best practices
-- **Troubleshooting** common issues
-- **Advanced configuration** options
-
-<!-- Need help? Check out the [Installation FAQ](https://docs.horilla.com) or reach out to our [community support](#-support). -->
-
-## 🚀 Deployment
-
-For production deployment guides including Nginx, Apache, and cloud platforms:
-### 📖 [Deployment Guide → docs.horilla.com/technical/v2.0/doc/deployment/nginx-gunicorn](https://docs.horilla.com/technical/v2.0/doc/deployment/nginx-gunicorn)
-
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Setup
-
-```bash
-# Fork and clone your fork
-git clone -b dev/v2.0 https://github.com/YOUR_USERNAME/horilla-hr.git
-cd horilla-hr
-
-# Add upstream remote
-git remote add upstream https://github.com/horilla/horilla-hr.git
-
-# Create feature branch
-git checkout -b feature/your-feature-name
-
-# Install development dependencies
-pip install -r requirements.txt
-
-# Submit pull request
-```
-
-> **Note:** `2.0` is the repo default, so GitHub pre-selects it as your PR base. Before submitting, change the base branch to `dev/v2.0` — that's where active development and reviews happen, not `2.0`.
-
-### Code Standards
-
-- Follow [PEP 8](https://pep8.org/) for Python code
-- Use [Black](https://black.readthedocs.io/) for code formatting
-- Write tests for new features
-- Update documentation for user-facing changes
-
-## 🔒 Security
-
-### Security Features
-
-- 🔐 **Authentication & Authorization** - Role-based access control
-- 🛡️ **Data Protection** - Encrypted sensitive data storage
-- 🔍 **Audit Trails** - Comprehensive activity logging
-- 🚫 **Input Validation** - XSS and injection protection
-- 🔒 **Session Security** - Secure session management
-
-### Reporting Security Issues
-
-Please report security vulnerabilities via [GitHub Private Vulnerability Reporting](https://github.com/horilla/horilla-hr/security/advisories/new), not email. Do not create public GitHub issues for security vulnerabilities. See [SECURITY.md](SECURITY.md) for full details.
-
-### Security Best Practices
-
-- Always use HTTPS in production
-- Regularly update dependencies
-- Use strong passwords and enable 2FA
-- Monitor logs for suspicious activities
-
-## 📞 Support
-
-### Community Support
-
-- 📖 **Documentation**: [docs.horilla.com](https://docs.horilla.com)
-- 💬 **GitHub Discussions**: [GitHub Discussions](https://github.com/horilla/horilla-hr/discussions)
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/horilla/horilla-hr/issues)
-- ✨ **Feature Requests**: [GitHub Issues](https://github.com/horilla/horilla-hr/issues)
-
-### Professional Support
-
-For enterprise support, custom development, and consulting services:
-- 📧 **Email**: support@horilla.com
-- 🌐 **Website**: [www.horilla.com](https://www.horilla.com)
-
-
-## 📄 License
-
-This project is licensed under the [LGPL-2.1 License](LICENSE) - see the LICENSE file for details.
-
-<div align="center">
-
-**Made with ❤️ by the Horilla Team**
-
-[⭐ Star us on GitHub](https://github.com/horilla/horilla-hr) | [🐛 Report Bug](https://github.com/horilla/horilla-hr/issues) | [💡 Request Feature](https://github.com/horilla/horilla-hr/issues)
-
-</div>
+This project is licensed under the **GNU Lesser General Public License v2.1 (LGPL-2.1)**.
+Rahul HRMS builds upon the open-source Horilla HRMS framework and incorporates custom enterprise branding, Supabase PostgreSQL, and Supabase Storage integrations.
+See the [LICENSE](LICENSE) file for complete details.
