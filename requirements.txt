@@ -75,13 +75,12 @@ phonenumbers==9.0.37
 pycountry==24.6.1
 python-bidi
 rapidfuzz==3.9.6
-spacy==3.7.5
-https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
+
+# Supabase & Cloud Storage
+supabase>=2.30.0
+boto3
 
 # Misc
 bleach==6.2.0
 gunicorn==23.0.0
 packaging
-
-# Testing
-coverage>=7.0

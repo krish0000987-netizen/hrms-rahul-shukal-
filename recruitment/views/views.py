@@ -25,7 +25,6 @@ from urllib.parse import parse_qs
 import phonenumbers
 import pycountry
 import pymupdf  # type: ignore
-import spacy
 from dateutil import parser as dateutil_parser
 from django import template
 from django.conf import settings
@@ -3417,9 +3416,20 @@ def delete_reject_reason(request):
     return HttpResponse(f"<script>{script}</script>")
 
 
-# Loaded once per worker process at import time (spaCy model load is slow;
-# never call spacy.load() inside a request-handling function).
-_resume_nlp = spacy.load("en_core_web_sm")
+_resume_nlp = None
+
+
+def get_resume_nlp():
+    """Lazily load spaCy NLP model on demand."""
+    global _resume_nlp
+    if _resume_nlp is None:
+        try:
+            import spacy
+
+            _resume_nlp = spacy.load("en_core_web_sm")
+        except Exception:
+            _resume_nlp = False
+    return _resume_nlp if _resume_nlp is not False else None
 
 
 def extract_text_with_font_info(pdf):
@@ -3645,10 +3655,14 @@ def extract_info(pdf):
 
     max_font_size = max(item["font_size"] for item in ranked_text)
     top_spans = [item for item in ranked_text if item["font_size"] == max_font_size]
-    name_doc = _resume_nlp(" ".join(item["text"] for item in top_spans))
-    person_names = [ent.text for ent in name_doc.ents if ent.label_ == "PERSON"]
-    if person_names:
-        extracted_info["full_name"] = " ".join(person_names)
+    nlp = get_resume_nlp()
+    if nlp:
+        name_doc = nlp(" ".join(item["text"] for item in top_spans))
+        person_names = [ent.text for ent in name_doc.ents if ent.label_ == "PERSON"]
+        if person_names:
+            extracted_info["full_name"] = " ".join(person_names)
+        else:
+            extracted_info["full_name"] = " ".join(item["text"] for item in top_spans)
     else:
         extracted_info["full_name"] = " ".join(item["text"] for item in top_spans)
 
@@ -3667,41 +3681,42 @@ def extract_info(pdf):
 
     gpe_address_candidate = None
 
-    doc = _resume_nlp(full_text)
-    for ent in doc.ents:
-        if ent.label_ != "GPE":
-            continue
-        if not extracted_info["country"]:
-            try:
-                country_match = pycountry.countries.lookup(ent.text)
-                extracted_info["country"] = getattr(
-                    country_match, "common_name", country_match.name
-                )
-                # added: capture the containing line as an address candidate
-                if not gpe_address_candidate:
-                    candidate_line = _line_for_char_offset(ent.start_char)
-                    if (
-                        candidate_line
-                        and candidate_line.strip().lower() != ent.text.lower()
-                    ):
-                        gpe_address_candidate = candidate_line.strip()
+    if nlp:
+        doc = nlp(full_text)
+        for ent in doc.ents:
+            if ent.label_ != "GPE":
                 continue
-            except LookupError:
-                pass
-        if not extracted_info["state"]:
-            try:
-                subdivision_match = pycountry.subdivisions.lookup(ent.text)
-                extracted_info["state"] = subdivision_match.name
-                # added: capture the containing line as an address candidate
-                if not gpe_address_candidate:
-                    candidate_line = _line_for_char_offset(ent.start_char)
-                    if (
-                        candidate_line
-                        and candidate_line.strip().lower() != ent.text.lower()
-                    ):
-                        gpe_address_candidate = candidate_line.strip()
-            except LookupError:
-                pass
+            if not extracted_info["country"]:
+                try:
+                    country_match = pycountry.countries.lookup(ent.text)
+                    extracted_info["country"] = getattr(
+                        country_match, "common_name", country_match.name
+                    )
+                    # added: capture the containing line as an address candidate
+                    if not gpe_address_candidate:
+                        candidate_line = _line_for_char_offset(ent.start_char)
+                        if (
+                            candidate_line
+                            and candidate_line.strip().lower() != ent.text.lower()
+                        ):
+                            gpe_address_candidate = candidate_line.strip()
+                    continue
+                except LookupError:
+                    pass
+            if not extracted_info["state"]:
+                try:
+                    subdivision_match = pycountry.subdivisions.lookup(ent.text)
+                    extracted_info["state"] = subdivision_match.name
+                    # added: capture the containing line as an address candidate
+                    if not gpe_address_candidate:
+                        candidate_line = _line_for_char_offset(ent.start_char)
+                        if (
+                            candidate_line
+                            and candidate_line.strip().lower() != ent.text.lower()
+                        ):
+                            gpe_address_candidate = candidate_line.strip()
+                except LookupError:
+                    pass
 
     phone_matches = list(phonenumbers.PhoneNumberMatcher(full_text, None))
     if phone_matches:

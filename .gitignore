@@ -169,3 +169,5 @@ CLAUDE.md
 .mcp.safe.json
 .claudeignore
 .specify/
+.vercel
+.env*
